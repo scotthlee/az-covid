@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, precision_recall_curve
+from sklearn.metrics import roc_auc_score
 
 import tools
 
@@ -23,6 +24,14 @@ symptom_list = [
     'fever', 'chills', 'shiver', 'ma', 'congestion',
     'sorethroat', 'cough', 'sob', 'difficultbreath', 'nauseavom',
     'headache', 'abpain', 'diarrhea', 'losstastesmell', 'fatigue'
+]
+
+today_list = [
+      'ftoday', 'chillstoday', 'shivertoday', 'muscletoday', 
+      'congestiontoday', 'sorethroattoday', 'coughtoday', 'sobtoday', 
+      'difficultbreathtoday', 'nauseavomtoday', 'headachetoday', 
+      'abpaintoday', 'diarrheatoday', 'losstastesmelltoday', 
+      'fatiguetoday'
 ]
 
 # Loading the arrays and making the targets
@@ -42,7 +51,6 @@ for i in range(X.shape[0]):
     if pcr[i] == 0 and ant[i] == 1:
         mc[i] = 2
 
-'''Results for PCR'''
 # Splitting into traininig and test sets
 train, test = train_test_split(range(X.shape[0]),
                                test_size=0.4,
@@ -53,6 +61,7 @@ val, test = train_test_split(test,
                              stratify=pcr[test],
                              random_state=2021)
 
+'''Results for PCR'''
 # Running a few baseline models
 lgr = LogisticRegression(penalty='none')
 lgr.fit(X, pcr)
@@ -62,15 +71,64 @@ coefs['symptom'] = symptom_list
 coefs.to_csv(file_dir + 'pcr_lgr_coefs.csv', index=False)
 
 pcr_rf = RandomForestClassifier(n_estimators=10000, 
-                            n_jobs=-1,
-                            oob_score=True)
+                                n_jobs=-1,
+                                oob_score=True)
 pcr_rf.fit(X, pcr)
+rf_probs = pcr_rf.oob_decision_function_[:, 1]
+pcr_gm = tools.grid_metrics(pcr, rf_probs)
+f1_cut = pcr_gm.cutoff.values[pcr_gm.f1.argmax()]
 pcr_rf_stats = tools.clf_metrics(pcr,
-                                 pcr_rf.oob_decision_function_[:, 1],
+                                 rf_probs,
                                  preds_are_probs=True,
                                  cutpoint=f1_cut,
                                  mod_name='pcr_rf')
-pcr_rf_roc = 
+pcr_rf_auc = roc_auc_score(pcr, rf_probs)
+pcr_rf_roc = roc_curve(pcr, rf_probs)
+
+'''Results for antigen'''
+lgr = LogisticRegression(penalty='none')
+lgr.fit(X, ant)
+coefs = pd.DataFrame(np.exp(lgr.coef_)[0],
+                     columns=['aOR'])
+coefs['symptom'] = symptom_list
+coefs.to_csv(file_dir + 'ant_lgr_coefs.csv', index=False)
+
+ant_rf = RandomForestClassifier(n_estimators=10000,
+                                n_jobs=-1,
+                                oob_score=True)
+ant_rf.fit(X, ant)
+ant_probs = ant_rf.oob_decision_function_[:, 1]
+ant_gm = tools.grid_metrics(ant, ant_probs)
+ant_cut = ant_gm.cutoff.values[ant_gm.f1.argmax()]
+ant_rf_stats = tools.clf_metrics(ant,
+                                 ant_probs,
+                                 preds_are_probs=True,
+                                 cutpoint=ant_cut,
+                                 mod_name='ant_rf')
+
+'''Results for multiclass'''
+# Multinomial logistic regression
+lgr = LogisticRegression(penalty='none', 
+                         multi_class='multinomial')
+lgr.fit(X, mc)
+coefs = pd.DataFrame(np.exp(lgr.coef_),
+                     columns=symptom_list)
+coefs['test_class'] = ['-/-', '+/-', '-/+', '+/+']
+coefs.to_csv(file_dir + 'mc_lgr_coefs.csv', index=False)
+
+# And the big random forest
+mc_rf = RandomForestClassifier(n_estimators=10000,
+                               n_jobs=-1,
+                               oob_score=True)
+mc_rf.fit(X, mc)
+mc_probs = mc_rf.oob_decision_function_
+mc_stats = tools.clf_metrics(mc,
+                             mc_probs,
+                             preds_are_probs=True,
+                             mod_name='mc_rf')
+
+'''Results for multilabel'''
+
 
 '''Mixing in the symptom-based predictors'''
 # Recreating some of the other case defs

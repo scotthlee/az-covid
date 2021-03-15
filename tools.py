@@ -196,7 +196,7 @@ def clf_metrics(true,
         out['model'] = mod_name
     
     return out
-
+    
 
 def jackknife_metrics(targets, 
                       guesses, 
