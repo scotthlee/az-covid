@@ -4,7 +4,6 @@ import itertools
 import pickle
 import time
 
-from sys import getsizeof
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.multioutput import MultiOutputClassifier
@@ -122,15 +121,34 @@ mc_rf = RandomForestClassifier(n_estimators=10000,
                                oob_score=True)
 mc_rf.fit(X, mc)
 mc_probs = mc_rf.oob_decision_function_
-mc_stats = tools.clf_metrics(mc,
-                             mc_probs,
-                             preds_are_probs=True,
-                             mod_name='mc_rf')
+macro_stats = tools.clf_metrics(mc,
+                                mc_probs,
+                                preds_are_probs=True,
+                                average='macro',
+                                mod_name='macro_mc')
+weighted_stats = tools.clf_metrics(mc,
+                                   mc_probs,
+                                   preds_are_probs=True,
+                                   average='weighted',
+                                   mod_name='weighted_mc')
 
-'''Results for multilabel'''
+# Getting the feature importances for comparison with the coefficients
+imps = mc_rf.feature_importances_
+imp_sort = np.argsort(imps)[::-1]
+sorted_features = [symptom_list[i] for i in imp_sort]
+feature_out = pd.DataFrame([sorted_features,
+                            [imps[i] for i in imp_sort]]).transpose()
+feature_out.columns = ['symptom', 'importance']
+feature_out.to_csv(file_dir + 'rf_features.csv', index=False)
 
+# Rolling up the different results
+stats = pd.concat([pcr_rf_stats,
+                   ant_rf_stats,
+                   macro_stats,
+                   weighted_stats], axis=0)
+stats.to_csv(file_dir + 'model_stats.csv', index=False)
 
-'''Mixing in the symptom-based predictors'''
+'''Looking at specific symptoms as predictors'''
 # Recreating some of the other case defs
 taste = records.losstastesmell.values
 fever = records.fever.values
