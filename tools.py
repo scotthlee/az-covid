@@ -3,6 +3,7 @@ import numpy as np
 import os
 
 from sklearn.metrics import confusion_matrix
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score, average_precision_score
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from scipy.stats import binom, chi2, norm
@@ -45,6 +46,23 @@ def brier_score(true, pred):
         row_sums = np.sum(squared_diffs, axis=1) 
         bs = row_sums.mean()
     return bs
+
+
+def fit_lgr(X, y,
+            penalty='none',
+            max_iter=5000,
+            reshape=True, 
+            exp=True):
+    '''Fits a GLM model to the data and returns the coefficients.'''
+    mod = LogisticRegression(penalty=penalty,
+                             max_iter=max_iter)
+    mod.fit(X, y)
+    out = mod.coef_.values
+    if exp:
+        out = np.exp(out)
+    if reshape:
+        out = out.reshape(-1, 1)
+    return out.transpose()
 
 
 # Runs basic diagnostic stats on categorical predictions
