@@ -148,6 +148,32 @@ stats = pd.concat([pcr_rf_stats,
                    weighted_stats], axis=0)
 stats.to_csv(file_dir + 'model_stats.csv', index=False)
 
+'''Getting bootstrap CIs for the multinomial regression'''
+# Number of pseudosamples
+n_boot = 100
+
+# Jackknife coefficients
+j_samps = tools.jackknife_sample(X)
+j_mods = [LogisticRegression(penalty='none').fit(X[j], mc[j]) 
+          for j in j_samps]
+j_coefs = [mod.coef_ for mod in j_mods]
+j_coefs = np.array(j_coefs)
+j_means = j_coefs.mean(axis=0)
+jacks = (j_coefs, j_means)
+
+# Running the bootstrap
+seeds = np.random.randint(1, 1e6, n_boot, random_state=2021)
+boots = [tools.boot_sample(X, seed=seed) for seed in seeds]
+b_mods = [LogisticRegression(penalty='none', n_jobs=-1).fit(X[b], mc[b])
+          for b in boots]
+b_coefs = np.array([mod.coef_ for mod in b_mods])
+
+# Getting the CIs
+cis = tools.boot_coef_cis(coef=lgr.coef_,
+                          jacks=jacks,
+                          boots=b_coefs,
+                          exp=True)
+
 '''Looking at specific symptoms as predictors'''
 # Recreating some of the other case defs
 taste = records.losstastesmell.values
