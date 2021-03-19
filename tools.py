@@ -48,23 +48,6 @@ def brier_score(true, pred):
     return bs
 
 
-def fit_lgr(X, y,
-            penalty='none',
-            max_iter=5000,
-            reshape=True, 
-            exp=True):
-    '''Fits a GLM model to the data and returns the coefficients.'''
-    mod = LogisticRegression(penalty=penalty,
-                             max_iter=max_iter)
-    mod.fit(X, y)
-    out = mod.coef_.values
-    if exp:
-        out = np.exp(out)
-    if reshape:
-        out = out.reshape(-1, 1)
-    return out.transpose()
-
-
 # Runs basic diagnostic stats on categorical predictions
 def clf_metrics(true, 
                 pred,
@@ -214,7 +197,7 @@ def clf_metrics(true,
         out['model'] = mod_name
     
     return out
-    
+
 
 def jackknife_metrics(targets, 
                       guesses, 
@@ -231,6 +214,118 @@ def jackknife_metrics(targets,
     means = scores.mean()
     
     return scores, means
+
+
+def boot_stat_cis(
+    stat,
+    jacks,
+    boots,
+    a=0.05,
+    exp=False,
+    method="bca",
+    interpolation="nearest",
+    transpose=True,
+    outcome_axis=1,
+    stat_axis=2):
+    # Renaming because I'm lazy
+    j = jacks
+    n = len(boots)
+    
+    # Calculating the confidence intervals
+    lower = (a / 2) * 100
+    upper = 100 - lower
+
+    # Making sure a valid method was chosen
+    methods = ["pct", "diff", "bca"]
+    assert method in methods, "Method must be pct, diff, or bca."
+
+    # Calculating the CIs with method #1: the percentiles of the
+    # bootstrapped statistics
+    if method == "pct":
+        cis = np.nanpercentile(boots,
+                               q=(lower, upper),
+                               interpolation=interpolation,
+                               axis=0)
+        cis = pd.DataFrame(cis.transpose(),
+                           columns=["lower", "upper"],
+                           index=colnames)
+
+    # Or with method #2: the percentiles of the difference between the
+    # obesrved statistics and the bootstrapped statistics
+    elif method == "diff":
+        diffs = stat - boots
+        percents = np.nanpercentile(diffs,
+                                    q=(lower, upper),
+                                    interpolation=interpolation,
+                                    axis=0)
+        lower_bound = pd.Series(stat_vals + percents[0])
+        upper_bound = pd.Series(stat_vals + percents[1])
+        cis = pd.concat([lower_bound, upper_bound], axis=1)
+        cis = cis.set_index(stat.index)
+
+    # Or with method #3: the bias-corrected and accelerated bootstrap
+    elif method == "bca":
+        # Calculating the bias-correction factor
+        n_less = np.sum(boots < stat, axis=0)
+        p_less = n_less / n
+        z0 = norm.ppf(p_less)
+
+        # Fixing infs in z0
+        z0[np.where(np.isinf(z0))[0]] = 0.0
+
+        # Estiamating the acceleration factor
+        diffs = j[1] - j[0]
+        numer = np.sum(np.power(diffs, 3))
+        denom = 6 * np.power(np.sum(np.power(diffs, 2)), 3 / 2)
+
+        # Getting rid of 0s in the denominator
+        zeros = np.where(denom == 0)[0]
+        for z in zeros:
+            denom[z] += 1e-6
+
+        # Finishing up the acceleration parameter
+        acc = numer / denom
+        jack = j
+
+        # Calculating the bounds for the confidence intervals
+        zl = norm.ppf(a / 2)
+        zu = norm.ppf(1 - (a / 2))
+        lterm = (z0 + zl) / (1 - acc * (z0 + zl))
+        uterm = (z0 + zu) / (1 - acc * (z0 + zu))
+        lower_q = norm.cdf(z0 + lterm) * 100
+        upper_q = norm.cdf(z0 + uterm) * 100
+
+        # Returning the CIs based on the adjusted quintiles;
+        # I know this code is hideous
+        if len(boots.shape) > 2:
+            n_outcomes = range(boots.shape[outcome_axis])
+            n_vars = range(boots.shape[stat_axis])
+            cis = np.array([
+                [np.nanpercentile(boots[:, i, j],
+                                  q =(lower_q[i][j], 
+                                      upper_q[i][j]),
+                                  axis=0) 
+                                  for i in n_outcomes]
+                for j in n_vars
+            ])
+        else:
+            n_stats = range(len(lower_q))
+            cis = np.array([
+                np.nanpercentile(boots[:, i],
+                                 q=(lower_q[i], upper_q[i]),
+                                 interpolation=interpolation,
+                                 axis=0) 
+                for i in n_stats])
+        
+        # Optional exponentiation for log-link models
+        if exp:
+            cis = np.exp(cis)
+        
+        # Optional transposition
+        if transpose:
+            cis = cis.transpose()
+
+    return cis
 
 
 # Calculates bootstrap confidence intervals for an estimator
@@ -388,6 +483,12 @@ def average_pvals(p_vals,
         stat = -2 * np.sum(np.log(p))
         p_avg = 1 - chi2(df=1).cdf(stat)
     return p_avg
+
+
+def jackknife_sample(X):
+    rows = np.array(list(range(X.shape[0])))
+    j_rows = [np.delete(rows, row) for row in rows]
+    return j_rows
 
 
 # Generates bootstrap indices of a dataset with the option
