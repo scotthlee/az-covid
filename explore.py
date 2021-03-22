@@ -162,17 +162,28 @@ j_means = j_coefs.mean(axis=0)
 jacks = (j_coefs, j_means)
 
 # Running the bootstrap
-seeds = np.random.randint(1, 1e6, n_boot, random_state=2021)
+seeds = np.random.randint(1, 1e6, n_boot)
 boots = [tools.boot_sample(X, seed=seed) for seed in seeds]
 b_mods = [LogisticRegression(penalty='none', n_jobs=-1).fit(X[b], mc[b])
           for b in boots]
 b_coefs = np.array([mod.coef_ for mod in b_mods])
 
 # Getting the CIs
-cis = tools.boot_coef_cis(coef=lgr.coef_,
+round = 2
+cis = tools.boot_stat_cis(stat=lgr.coef_,
                           jacks=jacks,
                           boots=b_coefs,
                           exp=True)
+stat = pd.DataFrame(np.exp(lgr.coef_), 
+                    columns=symptom_list).round(round).astype(str)
+lower = pd.DataFrame(cis[0], 
+                     columns=symptom_list).round(round).astype(str)
+upper = pd.DataFrame(cis[1], 
+                     columns=symptom_list).round(round).astype(str)
+out = stat + ' (' + lower + ', ' + upper + ')'
+out['result'] = ['-/-', '+/-', '-/+', '+/+']
+out.to_csv(file_dir + 'cis.csv', index=False)
+
 
 '''Looking at specific symptoms as predictors'''
 # Recreating some of the other case defs
