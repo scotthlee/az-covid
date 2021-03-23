@@ -169,8 +169,8 @@ def clf_metrics(true,
         out['auc'] = auc
         out['ap'] = ap
     else:
-        out['auc'] = np.nan
-        out['ap'] = np.nan
+        out['auc'] = 0
+        out['ap'] = 0
     
     # Calculating some additional measures based on positive calls
     true_prev = int(np.sum(true == 1))
@@ -336,10 +336,10 @@ class boot_cis:
         guesses,
         n=100,
         a=0.05,
+        group=None,
         method="bca",
         interpolation="nearest",
         average='weighted',
-        weighted=True,
         mcnemar=False,
         seed=10221983):
         # Converting everything to NumPy arrays, just in case
@@ -453,7 +453,9 @@ class boot_cis:
                     axis=0,
                 ) for i in range(len(lower_q))
             ]
-            cis = pd.DataFrame(cis, columns=["lower", "upper"], index=colnames)
+            cis = pd.DataFrame(cis, 
+                               columns=["lower", "upper"], 
+                               index=colnames)
 
         # Putting the stats with the lower and upper estimates
         cis = pd.concat([stat, cis], axis=1)
@@ -519,12 +521,13 @@ def boot_sample(df,
     # Sampling by group, if group has been specified
     else:
         levels = np.unique(by)
+        n_levels = len(levels)
         level_idx = [np.where(by == level)[0]
                      for level in levels]
-        boot = np.random.choice(level_idx,
-                                size=len(levels),
-                                replace=True) 
-        boot = np.concatenate(boot).ravel()
+        boot = np.random.choice(range(n_levels),
+                                size=n_levels,
+                                replace=True)
+        boot = np.concatenate([level_idx[i] for i in boot]).ravel()
     
     if not return_df:
         return boot

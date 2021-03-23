@@ -3,71 +3,86 @@ import pandas as pd
 
 import tools
 
-# Setting the working directory
-file_dir = 'C:/Users/yle4/OneDrive - CDC/Documents/projects/hh-transmission/'
+import numpy as np
+import pandas as pd
+import itertools
+import pickle
+import time
 
-# Brining in the two datasets
-master = pd.read_csv(file_dir + 'source csv/master.csv')
-records = pd.read_csv(file_dir + 'source csv/unf records.csv')
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_curve, precision_recall_curve
+from sklearn.metrics import roc_auc_score
 
-# Making a list of columns to keep
-base_list = [
-    'study_id_merge', 'hh_id', 'age', 'age_adult', 'ethnicity',
-    'sex', 'race', 'test1_pcr', 'test1'
-]
+import tools
+
+
+# Importing the original data
+file_dir = 'C:/Users/yle4/OneDrive - CDC/Documents/projects/az covid/'
+records = pd.read_csv(file_dir + 'original_records.csv')
+
+# Cleaning up column names
+records.columns = records.columns.str.replace('ever', '')
+records.columns.values[7] = 'fever'
+records.columns.values[26] = 'fevertoday'
+
+# List of symptom names and case definitions
 symptom_list = [
-    'wheeze', 'throat', 'sob', 'nausea', 'myalgia', 'headache',
-    'fatigue', 'discomf', 'diarrhea', 'cough', 'chestpain', 
-    'abdpain', 'fever_chills', 'nasal_combo', 'tastesmell_combo'
+    'fever', 'chills', 'shiver', 'ma', 'congestion',
+    'sorethroat', 'cough', 'sob', 'difficultbreath', 'nauseavom',
+    'headache', 'abpain', 'diarrhea', 'losstastesmell', 'fatigue'
 ]
-case_list = [
-    'ili', 'cdc', 'ari', 'cste', 'cli', 'vaccine_a1', 'vaccine_a2', 
-    'vaccine_a3', 'vaccine_a_all'
+
+today_list = [
+      'fevertoday', 'chillstoday', 'shivertoday', 'muscletoday', 
+      'congestiontoday', 'sorethroattoday', 'coughtoday', 'sobtoday', 
+      'difficultbreathtoday', 'nauseavomtoday', 'headachetoday', 
+      'abpaintoday', 'diarrheatoday', 'losstastesmelltoday', 
+      'fatiguetoday'
 ]
-all_cols = tools.flatten([base_list, symptom_list, case_list])
 
-# Renaming some of the original columns
-records.columns = records.columns.str.replace('_P14', '')
-records.columns = records.columns.str.lower()
-records.rename(columns={'cdc2':'cdc',
-                        'cdc_testing':'cdc_old',
-                        'classiccli':'cli',
-                        'ari_who_rsv':'ari'}, inplace=True)
+# Filling in symptoms today for the missing values
+same = np.where(records.sametoday == 1)[0]
+records.replace(np.nan, 0, inplace=True)
+records[today_list].iloc[same, :]= records[symptom_list].iloc[same, :]
 
-# Removing columns we don't need for the analysis
-records = records[all_cols]
+# Loading the arrays and making the targets
+n_tests = records.shape[0]
+pcr = np.array(records.Test_Result == 'Positive', dtype=np.uint8)
+ant = np.array(records.ANTIGEN_RESULT_ == 'Positive', dtype=np.uint8)
+ml = np.concatenate((pcr.reshape(-1, 1), 
+                     ant.reshape(-1, 1)), axis=1)
+mc = np.zeros((n_tests), dtype=np.uint8)
+mc_names = ['-/-', '+/-', '+/+']
+for i in range(n_tests):
+    if pcr[i] == 0 and ant[i] == 0:
+        mc[i] = 0
+    elif pcr[i] == 1 and ant[i] == 1:
+        mc[i] = 2
+    elif pcr[i] == 1 and ant[i] == 0:
+        mc[i] = 1
 
-# Checking out the sero pos data
-sero_cols = np.where(['sero' in doc for doc in master.columns.values])[0]
-sero_conv = pd.Series(np.array(master.sero_pair == 2, dtype=np.uint8))
-sero = master[['study_id_merge', 'sero_pos']]
-sero['sero_conv'] = pd.Series(sero_conv)
+records['multi'] = pd.Series(mc)
+records['pcr'] = pd.Series(pcr)
+records['ant'] = pd.Series(ant)
 
-# Merging the sero data with the study records
-records = records.merge(sero, on='study_id_merge')
+# Recreating some of the other case defs
+taste = records.losstastesmell.values
+fever = records.fever.values
+sob = records.sob.values
+chills = records.chills.values
+ma = records.ma.values
 
-# Replacing NaNs in the sero_pos column with 2
-sero_nan = np.where([np.isnan(res) for res in records.sero_pos])[0]
-records.sero_pos[sero_nan] = 2
-records.sero_pos = records.sero_pos.astype(np.uint8)
+fc = np.array(fever + chills > 0, dtype=np.uint8)
+sfc = np.array(fc + sob == 2, dtype=np.uint8)
+smfc = np.array(sob + ma + fc > 0, dtype=np.uint8)
 
-# Casting the original testing columns as numbers
-pcr_pos = np.array(records.test1_pcr == 'Yes', dtype=np.uint8)
-any_pos = np.array(records.test1 == 'Yes', dtype=np.uint8)
-records['pcr_pos'] = pd.Series(pcr_pos)
-records['any_pos'] = pd.Series(any_pos)
-records = records.drop(['test1_pcr', 'test1'], axis=1)
+mc1 = np.array(taste + smfc > 0, dtype=np.uint8)
+mc4 = np.array(taste + sfc > 0, dtype=np.uint8)
 
-# Saving the merged records to disk
-records.to_csv(file_dir + 'source csv/records.csv', index=False)
+records['cc1'] = pd.Series(mc1)
+records['cc4'] = pd.Series(mc4)
 
-# Making a separate dataset for public release
-records = records.drop(['age', 'ethnicity', 'race', 'sex'], 
-                              axis=1)
-records.study_id_merge = records.study_id_merge.str.replace('UT', 'A')
-records.study_id_merge = records.study_id_merge.str.replace('WI', 'B')
-records.hh_id = records.hh_id.str.replace('UT', 'A')
-records.hh_id = records.hh_id.str.replace('WI', 'B')
-
-# Writing the public release version to disk
-records.to_csv(file_dir + 'source csv/public records.csv', index=False)
+records.to_csv(file_dir + 'records.csv', index=False)

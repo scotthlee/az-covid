@@ -14,9 +14,19 @@ from sklearn.metrics import roc_auc_score
 import tools
 
 
+# Globals
+USE_TODAY = True
+N_BOOT = 100
+ROUND = 2
+
 # Importing the original data
 file_dir = 'C:/Users/yle4/OneDrive - CDC/Documents/projects/az covid/'
 records = pd.read_csv(file_dir + 'records.csv')
+
+# Droping PCR-/ANT+
+records.drop(records[(records.Test_Result == 'Negative') &
+                     (records.ANTIGEN_RESULT_ == 'Positive')].index,
+             inplace=True)
 
 # List of symptom names and case definitions
 symptom_list = [
@@ -26,29 +36,24 @@ symptom_list = [
 ]
 
 today_list = [
-      'ftoday', 'chillstoday', 'shivertoday', 'muscletoday', 
+      'fevertoday', 'chillstoday', 'shivertoday', 'muscletoday', 
       'congestiontoday', 'sorethroattoday', 'coughtoday', 'sobtoday', 
       'difficultbreathtoday', 'nauseavomtoday', 'headachetoday', 
       'abpaintoday', 'diarrheatoday', 'losstastesmelltoday', 
       'fatiguetoday'
 ]
 
+# Deciding what variables to include
+var_list = symptom_list
+if USE_TODAY:
+    var_list += today_list
+
 # Loading the arrays and making the targets
-X = pickle.load(open(file_dir + 'X.pkl', 'rb'))
-pcr = np.array(records.poscovid == 1, dtype=np.uint8)
-ant = np.array(records.ANTIGEN_RESULT_ == 'Positive', dtype=np.uint8)
-ml = np.concatenate((pcr.reshape(-1, 1), 
-                     ant.reshape(-1, 1)), axis=1)
-mc = np.zeros((X.shape[0]), dtype=np.uint8)
-for i in range(X.shape[0]):
-    if pcr[i] == 0 and ant[i] == 0:
-        mc[i] = 0
-    elif pcr[i] == 1 and ant[i] == 1:
-        mc[i] = 3
-    elif pcr[i] == 1 and ant[i] == 0:
-        mc[i] = 1
-    if pcr[i] == 0 and ant[i] == 1:
-        mc[i] = 2
+X = records[var_list].values.astype(np.uint8)
+pcr = records.pcr.values
+ant = records.ant.values
+mc = records.multi.values
+mc_names = ['-/-', '+/-', '+/+']
 
 # Splitting into traininig and test sets
 train, test = train_test_split(range(X.shape[0]),
@@ -62,20 +67,21 @@ val, test = train_test_split(test,
 
 '''Results for PCR'''
 # Running a few baseline models
-lgr = LogisticRegression(penalty='none')
-lgr.fit(X, pcr)
-coefs = pd.DataFrame(np.exp(lgr.coef_)[0],
-                     columns=['aOR'])
-coefs['symptom'] = symptom_list
-coefs.to_csv(file_dir + 'pcr_lgr_coefs.csv', index=False)
+pcr_lgr = LogisticRegression(penalty='none')
+pcr_lgr.fit(X, pcr)
+pcr_coefs = pd.DataFrame(np.exp(pcr_lgr.coef_)[0],
+                         columns=['aOR'])
+pcr_coefs['symptom'] = symptom_list
+pcr_coefs.to_csv(file_dir + 'pcr_lgr_coefs.csv', index=False)
 
 pcr_rf = RandomForestClassifier(n_estimators=10000, 
                                 n_jobs=-1,
                                 oob_score=True)
 pcr_rf.fit(X, pcr)
-rf_probs = pcr_rf.oob_decision_function_[:, 1]
-pcr_gm = tools.grid_metrics(pcr, rf_probs)
-f1_cut = pcr_gm.cutoff.values[pcr_gm.f1.argmax()]
+pcr_probs = pcr_rf.oob_decision_function_[:, 1]
+pcr_gm = tools.grid_metrics(pcr, pcr_probs)
+pcr_cut = pcr_gm.cutoff.values[pcr_gm.f1.argmax()]
+pcr_pred = tools.threshold(pcr_probs, pcr_cut)
 pcr_rf_stats = tools.clf_metrics(pcr,
                                  rf_probs,
                                  preds_are_probs=True,
@@ -85,12 +91,12 @@ pcr_rf_auc = roc_auc_score(pcr, rf_probs)
 pcr_rf_roc = roc_curve(pcr, rf_probs)
 
 '''Results for antigen'''
-lgr = LogisticRegression(penalty='none')
-lgr.fit(X, ant)
-coefs = pd.DataFrame(np.exp(lgr.coef_)[0],
-                     columns=['aOR'])
-coefs['symptom'] = symptom_list
-coefs.to_csv(file_dir + 'ant_lgr_coefs.csv', index=False)
+ant_lgr = LogisticRegression(penalty='none')
+ant_lgr.fit(X, ant)
+ant_coefs = pd.DataFrame(np.exp(ant_lgr.coef_)[0],
+                         columns=['aOR'])
+ant_coefs['symptom'] = symptom_list
+ant_coefs.to_csv(file_dir + 'ant_lgr_coefs.csv', index=False)
 
 ant_rf = RandomForestClassifier(n_estimators=10000,
                                 n_jobs=-1,
@@ -99,6 +105,7 @@ ant_rf.fit(X, ant)
 ant_probs = ant_rf.oob_decision_function_[:, 1]
 ant_gm = tools.grid_metrics(ant, ant_probs)
 ant_cut = ant_gm.cutoff.values[ant_gm.f1.argmax()]
+ant_pred = tools.threshold(ant_probs, ant_cut)
 ant_rf_stats = tools.clf_metrics(ant,
                                  ant_probs,
                                  preds_are_probs=True,
@@ -107,13 +114,15 @@ ant_rf_stats = tools.clf_metrics(ant,
 
 '''Results for multiclass'''
 # Multinomial logistic regression
-lgr = LogisticRegression(penalty='none', 
-                         multi_class='multinomial')
-lgr.fit(X, mc)
-coefs = pd.DataFrame(np.exp(lgr.coef_),
-                     columns=symptom_list)
-coefs['test_class'] = ['-/-', '+/-', '-/+', '+/+']
-coefs.to_csv(file_dir + 'mc_lgr_coefs.csv', index=False)
+mc_lgr = LogisticRegression(penalty='none',
+                            max_iter=5000,
+                            n_jobs=-1,
+                            multi_class='multinomial')
+mc_lgr.fit(X, mc)
+mc_coefs = pd.DataFrame(np.exp(mc_lgr.coef_),
+                        columns=var_list)
+mc_coefs['test_result'] = mc_names
+mc_coefs.to_csv(file_dir + 'mc_lgr_coefs.csv', index=False)
 
 # And the big random forest
 mc_rf = RandomForestClassifier(n_estimators=10000,
@@ -121,6 +130,7 @@ mc_rf = RandomForestClassifier(n_estimators=10000,
                                oob_score=True)
 mc_rf.fit(X, mc)
 mc_probs = mc_rf.oob_decision_function_
+mc_pred = np.argmax(mc_probs, axis=1)
 macro_stats = tools.clf_metrics(mc,
                                 mc_probs,
                                 preds_are_probs=True,
@@ -141,6 +151,12 @@ feature_out = pd.DataFrame([sorted_features,
 feature_out.columns = ['symptom', 'importance']
 feature_out.to_csv(file_dir + 'rf_features.csv', index=False)
 
+# Saving the RF predictions to the records file
+records['multi_pred'] = mc_pred
+records['pcr_pred'] = pcr_pred
+records['ant_pred'] = ant_pred
+records.to_csv(file_dir + 'records.csv', index=False)
+
 # Rolling up the different results
 stats = pd.concat([pcr_rf_stats,
                    ant_rf_stats,
@@ -149,12 +165,11 @@ stats = pd.concat([pcr_rf_stats,
 stats.to_csv(file_dir + 'model_stats.csv', index=False)
 
 '''Getting bootstrap CIs for the multinomial regression'''
-# Number of pseudosamples
-n_boot = 100
-
 # Jackknife coefficients
 j_samps = tools.jackknife_sample(X)
-j_mods = [LogisticRegression(penalty='none').fit(X[j], mc[j]) 
+j_mods = [LogisticRegression(penalty='none',
+                             n_jobs=-1,
+                             max_iter=5000).fit(X[j], mc[j]) 
           for j in j_samps]
 j_coefs = [mod.coef_ for mod in j_mods]
 j_coefs = np.array(j_coefs)
@@ -162,41 +177,26 @@ j_means = j_coefs.mean(axis=0)
 jacks = (j_coefs, j_means)
 
 # Running the bootstrap
-seeds = np.random.randint(1, 1e6, n_boot)
+seeds = np.random.randint(1, 1e6, N_BOOT)
 boots = [tools.boot_sample(X, seed=seed) for seed in seeds]
-b_mods = [LogisticRegression(penalty='none', n_jobs=-1).fit(X[b], mc[b])
+b_mods = [LogisticRegression(penalty='none', 
+                             n_jobs=-1,
+                             max_iter=5000).fit(X[b], mc[b])
           for b in boots]
 b_coefs = np.array([mod.coef_ for mod in b_mods])
 
 # Getting the CIs
-round = 2
-cis = tools.boot_stat_cis(stat=lgr.coef_,
+cis = tools.boot_stat_cis(stat=mc_lgr.coef_,
                           jacks=jacks,
                           boots=b_coefs,
                           exp=True)
-stat = pd.DataFrame(np.exp(lgr.coef_), 
-                    columns=symptom_list).round(round).astype(str)
+stat = pd.DataFrame(np.exp(mc_lgr.coef_), 
+                    columns=symptom_list).round(ROUND).astype(str)
 lower = pd.DataFrame(cis[0], 
-                     columns=symptom_list).round(round).astype(str)
+                     columns=symptom_list).round(ROUND).astype(str)
 upper = pd.DataFrame(cis[1], 
-                     columns=symptom_list).round(round).astype(str)
+                     columns=symptom_list).round(ROUND).astype(str)
 out = stat + ' (' + lower + ', ' + upper + ')'
-out['result'] = ['-/-', '+/-', '-/+', '+/+']
+out['test_result'] = mc_names
 out.to_csv(file_dir + 'cis.csv', index=False)
-
-
-'''Looking at specific symptoms as predictors'''
-# Recreating some of the other case defs
-taste = records.losstastesmell.values
-fever = records.fever.values
-sob = records.sob.values
-chills = records.chills.values
-ma = records.ma.values
-
-fc = np.array(fever + chills > 0, dtype=np.uint8)
-sfc = np.array(fc + sob == 2, dtype=np.uint8)
-smfc = np.array(sob + ma + fc > 0, dtype=np.uint8)
-
-mc1 = np.array(taste + smfc > 0, dtype=np.uint8)
-mc4 = np.array(taste + sfc > 0, dtype=np.uint8)
 
