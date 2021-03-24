@@ -6,7 +6,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score, average_precision_score
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
-from scipy.stats import binom, chi2, norm
+from scipy.stats import binom, chi2, norm, percentileofscore
 from copy import deepcopy
 from multiprocessing import Pool
 from copy import deepcopy
@@ -216,17 +216,61 @@ def jackknife_metrics(targets,
     return scores, means
 
 
-def boot_stat_cis(
-    stat,
-    jacks,
-    boots,
-    a=0.05,
-    exp=False,
-    method="bca",
-    interpolation="nearest",
-    transpose=True,
-    outcome_axis=1,
-    stat_axis=2):
+def invert_BCA(q, b, acc, lower=True):
+    if np.isnan(q):
+        return q
+    if np.any(q >= 1):
+        q /= 100
+    z = norm.ppf(q)
+    numer = z - 2*b - z*b*acc - b**2*acc
+    denom = 1 + b*acc + z*acc
+    if lower:
+        return 2 * norm.cdf(numer / denom)
+    else:
+        return 2 * (1 - norm.cdf(numer / denom))
+
+
+def BCA_pval(bca, null=0):
+    scores = bca.scores
+    n_cols = bca.scores.shape[1]
+    
+    # Making the vector of null values
+    if type(null) == type(0):
+        null = np.array([null] * n_cols)
+    
+    # Figuring out which nulls exist in the bootstrap data
+    good_nulls = []
+    for i in range(n_cols):
+        col = scores.iloc[:, i]
+        good_nulls.append(col.min() <= null[i] <= col.max())
+    
+    # Getting the percentile for each null
+    null_qs = np.array([percentileofscore(bca.scores.iloc[:, i], null[i]) 
+               if good_nulls[i] else np.nan for i in range(n_cols)]) / 100
+    
+    # Figuring out whether to look at the lower or upper quantile
+    lower = [q <= .5 if not np.isnan(q) else q for q in null_qs]
+    
+    # Getting the p-value associated with each null percentile
+    pvals = np.array([invert_BCA(null_qs[i],
+                                 bca.b[i],
+                                 bca.acc[i],
+                                 lower=lower[i])
+                      for i in range(n_cols)])
+    
+    return pvals, good_nulls, null_qs, lower
+
+
+def boot_stat_cis(stat,
+                  jacks,
+                  boots,
+                  a=0.05,
+                  exp=False,
+                  method="bca",
+                  interpolation="nearest",
+                  transpose=True,
+                  outcome_axis=1,
+                  stat_axis=2):
     # Renaming because I'm lazy
     j = jacks
     n = len(boots)
@@ -292,8 +336,8 @@ def boot_stat_cis(
         zu = norm.ppf(1 - (a / 2))
         lterm = (z0 + zl) / (1 - acc * (z0 + zl))
         uterm = (z0 + zu) / (1 - acc * (z0 + zu))
-        lower_q = norm.cdf(z0 + lterm) * 100
-        upper_q = norm.cdf(z0 + uterm) * 100
+        ql = norm.cdf(z0 + lterm) * 100
+        qu = norm.cdf(z0 + uterm) * 100
 
         # Returning the CIs based on the adjusted quintiles;
         # I know this code is hideous
@@ -302,17 +346,17 @@ def boot_stat_cis(
             n_vars = range(boots.shape[stat_axis])
             cis = np.array([
                 [np.nanpercentile(boots[:, i, j],
-                                  q =(lower_q[i][j], 
-                                      upper_q[i][j]),
+                                  q =(ql[i][j], 
+                                      qu[i][j]),
                                   axis=0) 
                                   for i in n_outcomes]
                 for j in n_vars
             ])
         else:
-            n_stats = range(len(lower_q))
+            n_stats = range(len(ql))
             cis = np.array([
                 np.nanpercentile(boots[:, i],
-                                 q=(lower_q[i], upper_q[i]),
+                                 q=(ql[i], qu[i]),
                                  interpolation=interpolation,
                                  axis=0) 
                 for i in n_stats])
@@ -439,19 +483,23 @@ class boot_cis:
             zu = norm.ppf(1 - (a / 2))
             lterm = (z0 + zl) / (1 - acc * (z0 + zl))
             uterm = (z0 + zu) / (1 - acc * (z0 + zu))
-            lower_q = norm.cdf(z0 + lterm) * 100
-            upper_q = norm.cdf(z0 + uterm) * 100
-            self.lower_q = lower_q
-            self.upper_q = upper_q
+            ql = norm.cdf(z0 + lterm) * 100
+            qu = norm.cdf(z0 + uterm) * 100
+            
+            # Passing things back to the class
+            self.acc = acc.values
+            self.b = z0
+            self.ql = ql
+            self.qu = qu
 
             # Returning the CIs based on the adjusted quintiles
             cis = [
                 np.nanpercentile(
                     scores.iloc[:, i],
-                    q=(lower_q[i], upper_q[i]),
+                    q=(ql[i], qu[i]),
                     interpolation=interpolation,
                     axis=0,
-                ) for i in range(len(lower_q))
+                ) for i in range(len(ql))
             ]
             cis = pd.DataFrame(cis, 
                                columns=["lower", "upper"], 
@@ -613,15 +661,15 @@ def diff_boot_cis(ref,
         zu = norm.ppf(1 - (a/2))
         lterm = (z0 + zl) / (1 - acc*(z0 + zl))
         uterm = (z0 + zu) / (1 - acc*(z0 + zu))
-        lower_q = norm.cdf(z0 + lterm) * 100
-        upper_q = norm.cdf(z0 + uterm) * 100
+        ql = norm.cdf(z0 + lterm) * 100
+        qu = norm.cdf(z0 + uterm) * 100
                                 
         # Returning the CIs based on the adjusted quantiles
         cis = [np.nanpercentile(diff_scores.iloc[:, i], 
-                                q=(lower_q[i], upper_q[i]),
+                                q=(ql[i], qu[i]),
                                 interpolation=interpolation,
                                 axis=0) 
-               for i in range(len(lower_q))]
+               for i in range(len(ql))]
         cis = pd.DataFrame(cis, columns=['lower', 'upper'])
                 
     cis = pd.concat([ref_stat, comp_stat, diff_stat, cis], 
