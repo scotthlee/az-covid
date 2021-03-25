@@ -55,18 +55,7 @@ ant = records.ant.values
 mc = records.multi.values
 mc_names = ['-/-', '+/-', '+/+']
 
-# Splitting into traininig and test sets
-train, test = train_test_split(range(X.shape[0]),
-                               test_size=0.4,
-                               stratify=pcr,
-                               random_state=2021)
-val, test = train_test_split(test,
-                             test_size=0.5,
-                             stratify=pcr[test],
-                             random_state=2021)
-
 '''Results for PCR'''
-# Running a few baseline models
 pcr_lgr = LogisticRegression(penalty='none')
 pcr_lgr.fit(X, pcr)
 pcr_coefs = pd.DataFrame(np.exp(pcr_lgr.coef_)[0],
@@ -83,12 +72,12 @@ pcr_gm = tools.grid_metrics(pcr, pcr_probs)
 pcr_cut = pcr_gm.cutoff.values[pcr_gm.f1.argmax()]
 pcr_pred = tools.threshold(pcr_probs, pcr_cut)
 pcr_rf_stats = tools.clf_metrics(pcr,
-                                 rf_probs,
+                                 pcr_probs,
                                  preds_are_probs=True,
-                                 cutpoint=f1_cut,
+                                 cutpoint=pcr_cut,
                                  mod_name='pcr_rf')
-pcr_rf_auc = roc_auc_score(pcr, rf_probs)
-pcr_rf_roc = roc_curve(pcr, rf_probs)
+pcr_rf_auc = roc_auc_score(pcr, pcr_probs)
+pcr_rf_roc = roc_curve(pcr, pcr_probs)
 
 '''Results for antigen'''
 ant_lgr = LogisticRegression(penalty='none')
@@ -198,5 +187,5 @@ upper = pd.DataFrame(cis[1],
                      columns=symptom_list).round(ROUND).astype(str)
 out = stat + ' (' + lower + ', ' + upper + ')'
 out['test_result'] = mc_names
-out.to_csv(file_dir + 'cis.csv', index=False)
+out.to_csv(file_dir + 'lgr_cis.csv', index=False)
 

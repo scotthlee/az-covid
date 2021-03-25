@@ -43,10 +43,21 @@ today_list = [
       'fatiguetoday'
 ]
 
-# Filling in symptoms today for the missing values
+# Replacing NaNs in the symptoms today
+for i, s in enumerate(today_list):
+    records[s].replace(np.nan, 0, inplace=True)
+
+# Making and saving a composite symptom array
+s = records[symptom_list].values
+t = records[today_list].values
+comp = pd.DataFrame(np.array(s + t > 0, dtype=np.uint8), 
+             columns=symptom_list)
+comp.to_csv(file_dir + 'comp.csv', index=False)
+
+# Copying past symptoms for people with sametoday
 same = np.where(records.sametoday == 1)[0]
-records.replace(np.nan, 0, inplace=True)
-records[today_list].iloc[same, :]= records[symptom_list].iloc[same, :]
+for i, s in enumerate(today_list):
+    records[s][same] = records[symptom_list[i]][same]
 
 # Loading the arrays and making the targets
 n_tests = records.shape[0]

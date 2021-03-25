@@ -230,12 +230,12 @@ def invert_BCA(q, b, acc, lower=True):
         return 2 * (1 - norm.cdf(numer / denom))
 
 
-def BCA_pval(bca, null=0):
+def BCA_pval(bca, null=0.0):
     scores = bca.scores
     n_cols = bca.scores.shape[1]
     
     # Making the vector of null values
-    if type(null) == type(0):
+    if type(null) == type(0.0):
         null = np.array([null] * n_cols)
     
     # Figuring out which nulls exist in the bootstrap data
@@ -320,7 +320,7 @@ def boot_stat_cis(stat,
         # Estiamating the acceleration factor
         diffs = j[1] - j[0]
         numer = np.sum(np.power(diffs, 3))
-        denom = 6 * np.power(np.sum(np.power(diffs, 2)), 3 / 2)
+        denom = 6 * np.power(np.sum(np.power(diffs, 2)), 3/2)
 
         # Getting rid of 0s in the denominator
         zeros = np.where(denom == 0)[0]
@@ -329,7 +329,6 @@ def boot_stat_cis(stat,
 
         # Finishing up the acceleration parameter
         acc = numer / denom
-        jack = j
 
         # Calculating the bounds for the confidence intervals
         zl = norm.ppf(a / 2)
@@ -339,7 +338,7 @@ def boot_stat_cis(stat,
         ql = norm.cdf(z0 + lterm) * 100
         qu = norm.cdf(z0 + uterm) * 100
 
-        # Returning the CIs based on the adjusted quintiles;
+        # Returning the CIs based on the adjusted quantiles;
         # I know this code is hideous
         if len(boots.shape) > 2:
             n_outcomes = range(boots.shape[outcome_axis])
@@ -583,102 +582,110 @@ def boot_sample(df,
         return df.iloc[boot, :]
     
 
-def diff_boot_cis(ref, 
-                  comp, 
-                  a=0.05,
-                  abs_diff=False, 
-                  method='bca',
-                  interpolation='nearest'):
-    # Quick check for a valid estimation method
-    methods = ['pct', 'diff', 'bca']
-    assert method in methods, 'Method must be pct, diff, or bca.'
-    
-    # Pulling out the original estiamtes
-    ref_stat = pd.Series(ref.cis.stat.drop('true_prev').values)
-    ref_scores = ref.scores.drop('true_prev', axis=1)
-    comp_stat = pd.Series(comp.cis.stat.drop('true_prev').values)
-    comp_scores = comp.scores.drop('true_prev', axis=1)
-    
-    # Optionally Reversing the order of comparison
-    diff_scores = comp_scores - ref_scores
-    diff_stat = comp_stat - ref_stat
+class diff_boot_cis:
+    def __init__(self,
+                 ref,
+                 comp,
+                 a=0.05,
+                 abs_diff=False,
+                 method='bca',
+                 interpolation='nearest'):
+        # Quick check for a valid estimation method
+        methods = ['pct', 'diff', 'bca']
+        assert method in methods, 'Method must be pct, diff, or bca.'
         
-    # Setting the quantiles to retrieve
-    lower = (a / 2) * 100
-    upper = 100 - lower
-    
-    # Calculating the percentiles 
-    if method == 'pct':
-        cis = np.nanpercentile(diff_scores,
-                               q=(lower, upper),
-                               interpolation=interpolation,
-                               axis=0)
-        cis = pd.DataFrame(cis.transpose())
-    
-    elif method == 'diff':
-        diffs = diff_stat.values.reshape(1, -1) - diff_scores
-        percents = np.nanpercentile(diffs,
-                                    q=(lower, upper),
+        # Pulling out the original estiamtes
+        ref_stat = pd.Series(ref.cis.stat.drop('true_prev').values)
+        ref_scores = ref.scores.drop('true_prev', axis=1)
+        comp_stat = pd.Series(comp.cis.stat.drop('true_prev').values)
+        comp_scores = comp.scores.drop('true_prev', axis=1)
+        
+        # Optionally Reversing the order of comparison
+        diff_scores = comp_scores - ref_scores
+        diff_stat = comp_stat - ref_stat
+            
+        # Setting the quantiles to retrieve
+        lower = (a / 2) * 100
+        upper = 100 - lower
+        
+        # Calculating the percentiles 
+        if method == 'pct':
+            cis = np.nanpercentile(diff_scores,
+                                   q=(lower, upper),
+                                   interpolation=interpolation,
+                                   axis=0)
+            cis = pd.DataFrame(cis.transpose())
+        
+        elif method == 'diff':
+            diffs = diff_stat.values.reshape(1, -1) - diff_scores
+            percents = np.nanpercentile(diffs,
+                                        q=(lower, upper),
+                                        interpolation=interpolation,
+                                        axis=0)
+            lower_bound = pd.Series(diff_stat + percents[0])
+            upper_bound = pd.Series(diff_stat + percents[1])
+            cis = pd.concat([lower_bound, upper_bound], axis=1)
+        
+        elif method == 'bca':
+            # Removing true prevalence from consideration to avoid NaNs
+            ref_j_means = ref.jack[1].drop('true_prev')
+            ref_j_scores = ref.jack[0].drop('true_prev', axis=1)
+            comp_j_means = comp.jack[1].drop('true_prev')
+            comp_j_scores = comp.jack[0].drop('true_prev', axis=1)
+            
+            # Calculating the bias-correction factor
+            n = ref.scores.shape[0]
+            stat_vals = diff_stat.transpose().values.ravel()
+            n_less = np.sum(diff_scores < stat_vals, axis=0)
+            p_less = n_less / n
+            z0 = norm.ppf(p_less)
+            
+            # Fixing infs in z0
+            z0[np.where(np.isinf(z0))[0]] = 0.0
+            
+            # Estiamating the acceleration factor
+            j_means = comp_j_means - ref_j_means
+            j_scores = comp_j_scores - ref_j_scores
+            diffs = j_means - j_scores
+            numer = np.sum(np.power(diffs, 3))
+            denom = 6 * np.power(np.sum(np.power(diffs, 2)), 3/2)
+            
+            # Getting rid of 0s in the denominator
+            zeros = np.where(denom == 0)[0]
+            for z in zeros:
+                denom[z] += 1e-6
+            
+            acc = numer / denom
+            
+            # Calculating the bounds for the confidence intervals
+            zl = norm.ppf(a / 2)
+            zu = norm.ppf(1 - (a/2))
+            lterm = (z0 + zl) / (1 - acc*(z0 + zl))
+            uterm = (z0 + zu) / (1 - acc*(z0 + zu))
+            ql = norm.cdf(z0 + lterm) * 100
+            qu = norm.cdf(z0 + uterm) * 100
+                                    
+            # Returning the CIs based on the adjusted quantiles
+            cis = [np.nanpercentile(diff_scores.iloc[:, i], 
+                                    q=(ql[i], qu[i]),
                                     interpolation=interpolation,
-                                    axis=0)
-        lower_bound = pd.Series(diff_stat + percents[0])
-        upper_bound = pd.Series(diff_stat + percents[1])
-        cis = pd.concat([lower_bound, upper_bound], axis=1)
-    
-    elif method == 'bca':
-        # Removing true prevalence from consideration to avoid NaNs
-        ref_j_means = ref.jack[1].drop('true_prev')
-        ref_j_scores = ref.jack[0].drop('true_prev', axis=1)
-        comp_j_means = comp.jack[1].drop('true_prev')
-        comp_j_scores = comp.jack[0].drop('true_prev', axis=1)
+                                    axis=0) 
+                   for i in range(len(ql))]
+            cis = pd.DataFrame(cis, columns=['lower', 'upper'])
+                    
+        cis = pd.concat([ref_stat, comp_stat, diff_stat, cis], 
+                        axis=1)
+        cis = cis.set_index(ref_scores.columns.values)
+        cis.columns = ['ref', 'comp', 'd', 
+                       'lower', 'upper']
         
-        # Calculating the bias-correction factor
-        n = ref.scores.shape[0]
-        stat_vals = diff_stat.transpose().values.ravel()
-        n_less = np.sum(diff_scores < stat_vals, axis=0)
-        p_less = n_less / n
-        z0 = norm.ppf(p_less)
+        # Passing stuff back up to return
+        self.cis = cis
+        self.scores = diff_scores
+        self.b = z0
+        self.acc = acc
         
-        # Fixing infs in z0
-        z0[np.where(np.isinf(z0))[0]] = 0.0
-        
-        # Estiamating the acceleration factor
-        j_means = comp_j_means - ref_j_means
-        j_scores = comp_j_scores - ref_j_scores
-        diffs = j_means - j_scores
-        numer = np.sum(np.power(diffs, 3))
-        denom = 6 * np.power(np.sum(np.power(diffs, 2)), 3/2)
-        
-        # Getting rid of 0s in the denominator
-        zeros = np.where(denom == 0)[0]
-        for z in zeros:
-            denom[z] += 1e-6
-        
-        acc = numer / denom
-        
-        # Calculating the bounds for the confidence intervals
-        zl = norm.ppf(a / 2)
-        zu = norm.ppf(1 - (a/2))
-        lterm = (z0 + zl) / (1 - acc*(z0 + zl))
-        uterm = (z0 + zu) / (1 - acc*(z0 + zu))
-        ql = norm.cdf(z0 + lterm) * 100
-        qu = norm.cdf(z0 + uterm) * 100
-                                
-        # Returning the CIs based on the adjusted quantiles
-        cis = [np.nanpercentile(diff_scores.iloc[:, i], 
-                                q=(ql[i], qu[i]),
-                                interpolation=interpolation,
-                                axis=0) 
-               for i in range(len(ql))]
-        cis = pd.DataFrame(cis, columns=['lower', 'upper'])
-                
-    cis = pd.concat([ref_stat, comp_stat, diff_stat, cis], 
-                    axis=1)
-    cis = cis.set_index(ref_scores.columns.values)
-    cis.columns = ['ref', 'comp', 'd', 
-                   'lower', 'upper']
-    
-    return cis
+        return
 
 
 def grid_metrics(targets,
