@@ -815,39 +815,3 @@ def max_probs(arr, maxes=None, axis=1):
     out = [arr[i, maxes[i]] for i in range(arr.shape[0])]
     return np.array(out)
 
-
-def write_stats(stats,
-                outcome,
-                stats_dir='output/analysis/'):
-    stats_filename = outcome + '_stats.csv'
-    if stats_filename in os.listdir(stats_dir):
-        stats_df = pd.read_csv(stats_dir + stats_filename)
-        stats_df = pd.concat([stats_df, stats], axis=0)
-        stats_df.to_csv(stats_dir + stats_filename, index=False)
-    else:
-        stats.to_csv(stats_dir + stats_filename, index=False)
-    return
-
-
-def write_preds(preds,
-                outcome,
-                mod_name,
-                probs=None,
-                test_idx=None,
-                output_dir='output/',
-                stats_folder='analysis/'):
-    stats_dir = output_dir + stats_folder
-    preds_filename = outcome + '_preds.csv'
-    if preds_filename in os.listdir(stats_dir):
-        preds_df = pd.read_csv(stats_dir + preds_filename)
-    else:
-        assert test_idx is not None
-        preds_df = pd.read_csv(output_dir + outcome + '_cohort.csv')
-        preds_df = preds_df.iloc[test_idx, :]
-    
-    preds_df[mod_name + '_pred'] = preds
-    if probs is not None:
-        preds_df[mod_name + '_prob'] = probs
-    preds_df.to_csv(stats_dir + preds_filename, index=False)
-    return
-
