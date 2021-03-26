@@ -751,7 +751,7 @@ def x_at_y(x, y, yval, grid):
 
 # Converts a boot_cis['cis'] object to a single row
 def merge_cis(c, round=4, mod_name=''):
-    str_cis = c.round(ROUND).astype(str)
+    str_cis = c.round(round).astype(str)
     str_paste = pd.DataFrame(str_cis.stat + ' (' + str_cis.lower + 
                                  ', ' + str_cis.upper + ')',
                                  columns=[mod_name]).transpose()
