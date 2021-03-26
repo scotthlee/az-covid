@@ -64,19 +64,12 @@ else:
     ant_cis = pickle.load(open(file_dir + 'ant_cis.pkl', 'rb'))
 
 # Making a table wth all the CIs
-str_pcr_cis = [c.cis.round(ROUND).astype(str) for c in pcr_cis]
-str_pcr_paste = [pd.DataFrame(c.stat + ' (' + c.lower + ', ' + c.upper + ')',
-                              columns=[var_list[i]])
-                 for i, c in enumerate(str_pcr_cis)]
-pcr_ci_out = pd.concat([c.transpose() for c in str_pcr_paste],
-                       axis=0)
-
-str_ant_cis = [c.cis.round(ROUND).astype(str) for c in ant_cis]
-str_ant_paste = [pd.DataFrame(c.stat + ' (' + c.lower + ', ' + c.upper + ')',
-                              columns=[var_list[i]])
-                 for i, c in enumerate(str_ant_cis)]
-ant_ci_out = pd.concat([c.transpose() for c in str_ant_paste],
-                       axis=0)
+pcr_ci_out = merge_ci_list(pcr_cis, 
+                           mod_names=var_list, 
+                           round=2)
+ant_ci_out = merge_ci_list(ant_cis, 
+                           mod_names=var_list, 
+                           round=2)
 
 # Writing the confidence intervals to disk
 if 'clf_cis.xlsx' not in dir_files:
