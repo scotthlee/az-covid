@@ -3,6 +3,7 @@ import pandas as pd
 import itertools
 import pickle
 import time
+import os
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -14,16 +15,29 @@ from sklearn.metrics import roc_auc_score
 import tools
 
 
+UNIX = True
+
 # Globals
 USE_TODAY = True
 N_BOOT = 100
 ROUND = 2
 
+# Using multiprocessing on Mac/Linux
+if UNIX:
+    base_dir = '/Users/scottlee/'
+    from multi import boot_cis
+else:
+    base_dir = 'C:/Users/yle4/'
+    from tools import boot_cis
+
 # Importing the original data
-file_dir = 'C:/Users/yle4/OneDrive - CDC/Documents/projects/az covid/'
+file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
+dir_files = os.listdir(file_dir)
 records = pd.read_csv(file_dir + 'records.csv')
 
 # Droping PCR-/ANT+
+to_drop = np.where((records.Test_Result == 'Negative') & (
+    records.ANTIGEN_RESULT_ == 'Positive'))[0]
 records.drop(records[(records.Test_Result == 'Negative') &
                      (records.ANTIGEN_RESULT_ == 'Positive')].index,
              inplace=True)
@@ -111,6 +125,7 @@ mc_lgr.fit(X, mc)
 mc_coefs = pd.DataFrame(np.exp(mc_lgr.coef_),
                         columns=var_list)
 mc_coefs['test_result'] = mc_names
+mc_coefs = mc_coefs.transpose()
 mc_coefs.to_csv(file_dir + 'mc_lgr_coefs.csv', index=False)
 
 # And the big random forest
@@ -175,17 +190,18 @@ b_mods = [LogisticRegression(penalty='none',
 b_coefs = np.array([mod.coef_ for mod in b_mods])
 
 # Getting the CIs
-cis = tools.boot_stat_cis(stat=mc_lgr.coef_,
+bounds = tools.boot_stat_cis(stat=mc_lgr.coef_,
                           jacks=jacks,
                           boots=b_coefs,
                           exp=True)
 stat = pd.DataFrame(np.exp(mc_lgr.coef_), 
                     columns=symptom_list).round(ROUND).astype(str)
-lower = pd.DataFrame(cis[0], 
+lower = pd.DataFrame(bounds[0], 
                      columns=symptom_list).round(ROUND).astype(str)
-upper = pd.DataFrame(cis[1], 
+upper = pd.DataFrame(bounds[1], 
                      columns=symptom_list).round(ROUND).astype(str)
 out = stat + ' (' + lower + ', ' + upper + ')'
 out['test_result'] = mc_names
-out.to_csv(file_dir + 'lgr_cis.csv', index=False)
+out = out[['test_result'] + symptom_list].transpose()
+out.to_csv(file_dir + 'lgr_cis.csv')
 
