@@ -10,9 +10,21 @@ from tools import boot_diff_cis
 
 
 # Globals
+FIRST_ONLY = True
+USE_TODAY = False
 N_BOOT = 100
 ROUND = 2
 UNIX = True
+
+# Globals
+UNIX = True
+DROP_DISC = True
+USE_TODAY = False
+FIRST_ONLY = True
+NO_PREV = False
+COMBINE = True
+N_BOOT = 100
+ROUND = 2
 
 # Using multiprocessing on Mac/Linux
 if UNIX:
@@ -27,12 +39,32 @@ file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
 dir_files = os.listdir(file_dir)
 records = pd.read_csv(file_dir + 'records.csv')
 
+# Optionally droping PCR-/ANT+
+if DROP_DISC:
+    disc = np.where((records.Test_Result == 'Negative') & 
+                    (records.ANTIGEN_RESULT_ == 'Positive'))[0]
+    records.drop(disc, axis=0, inplace=True)
+
+# Optionally keeping only the first test results
+if FIRST_ONLY:
+    g = records.groupby('PatientID')
+    date = 'Sample_Collection_Date'
+    records = g.apply(lambda x: x.sort_values(ascending=True,
+                                              by=date).head(1))
+    file_dir += 'first_only/'
+
+# Optionally leaving out folks who were previously positive
+if NO_PREV:
+    prev = np.where(records.poscovid != 1)[0]
+    records = records.iloc[prev, :]
+
 # List of symptom names and case definitions
-symptoms = [
+symptom_list = [
     'fever', 'chills', 'shiver', 'ma', 'congestion',
     'sorethroat', 'cough', 'sob', 'difficultbreath', 'nauseavom',
     'headache', 'abpain', 'diarrhea', 'losstastesmell', 'fatigue'
 ]
+
 today_list = [
       'fevertoday', 'chillstoday', 'shivertoday', 'muscletoday', 
       'congestiontoday', 'sorethroattoday', 'coughtoday', 'sobtoday', 
@@ -40,6 +72,11 @@ today_list = [
       'abpaintoday', 'diarrheatoday', 'losstastesmelltoday', 
       'fatiguetoday'
 ]
+
+if COMBINE:
+    combined = np.add(records[symptom_list].values,
+                      records[today_list].values)
+    records[symptom_list] = np.greater(combined, 0).astype(np.uint8)
 
 case_defs = ['CSTE', 'cc1', 'cc4']
 var_list = symptoms + case_defs

@@ -15,10 +15,13 @@ from sklearn.metrics import roc_auc_score
 import tools
 
 
-UNIX = True
-
 # Globals
-USE_TODAY = True
+UNIX = True
+DROP_DISC = True
+USE_TODAY = False
+FIRST_ONLY = True
+NO_PREV = False
+COMBINE = True
 N_BOOT = 100
 ROUND = 2
 
@@ -35,12 +38,24 @@ file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
 dir_files = os.listdir(file_dir)
 records = pd.read_csv(file_dir + 'records.csv')
 
-# Droping PCR-/ANT+
-to_drop = np.where((records.Test_Result == 'Negative') & (
-    records.ANTIGEN_RESULT_ == 'Positive'))[0]
-records.drop(records[(records.Test_Result == 'Negative') &
-                     (records.ANTIGEN_RESULT_ == 'Positive')].index,
-             inplace=True)
+# Optionally droping PCR-/ANT+
+if DROP_DISC:
+    disc = np.where((records.Test_Result == 'Negative') & 
+                    (records.ANTIGEN_RESULT_ == 'Positive'))[0]
+    records.drop(disc, axis=0, inplace=True)
+
+# Optionally keeping only the first test results
+if FIRST_ONLY:
+    g = records.groupby('PatientID')
+    date = 'Sample_Collection_Date'
+    records = g.apply(lambda x: x.sort_values(ascending=True,
+                                              by=date).head(1))
+    file_dir += 'first_only/'
+
+# Optionally leaving out folks who were previously positive
+if NO_PREV:
+    prev = np.where(records.poscovid != 1)[0]
+    records = records.iloc[prev, :]
 
 # List of symptom names and case definitions
 symptom_list = [
@@ -59,11 +74,18 @@ today_list = [
 
 # Deciding what variables to include
 var_list = symptom_list
-if USE_TODAY:
-    var_list += today_list
+
+if COMBINE:
+    combined = np.add(records[symptom_list].values,
+                      records[today_list].values)
+    X = np.greater(combined, 0).astype(np.uint8)
+else:
+    if USE_TODAY:
+        var_list += today_list
+    X = records[var_list].values.astype(np.uint8)
+
 
 # Loading the arrays and making the targets
-X = records[var_list].values.astype(np.uint8)
 pcr = records.pcr.values
 ant = records.ant.values
 mc = records.multi.values
