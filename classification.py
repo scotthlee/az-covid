@@ -6,15 +6,8 @@ import os
 from sklearn.metrics import roc_curve, precision_recall_curve
 from sklearn.metrics import roc_auc_score
 
-from tools import boot_diff_cis
+from tools import boot_diff_cis, merge_ci_list
 
-
-# Globals
-FIRST_ONLY = True
-USE_TODAY = False
-N_BOOT = 100
-ROUND = 2
-UNIX = True
 
 # Globals
 UNIX = True
@@ -36,7 +29,6 @@ else:
 
 # Importing the original data
 file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
-dir_files = os.listdir(file_dir)
 records = pd.read_csv(file_dir + 'records.csv')
 
 # Optionally droping PCR-/ANT+
@@ -79,9 +71,11 @@ if COMBINE:
     records[symptom_list] = np.greater(combined, 0).astype(np.uint8)
 
 case_defs = ['CSTE', 'cc1', 'cc4']
-var_list = symptoms + case_defs
+var_list = symptom_list + case_defs
 
 # Getting CIs for the symptoms
+dir_files = os.listdir(file_dir)
+
 if 'pcr_cis.pkl' not in dir_files:
     pcr_cis = [boot_cis(records.pcr,
                         records[var],
@@ -114,4 +108,6 @@ if 'clf_cis.xlsx' not in dir_files:
     for i, cis in enumerate([pcr_ci_out, ant_ci_out]):
         cis.to_excel(writer, sheet_name=['pcr', 'ant'][i])
     writer.save()
-
+else:
+    pcr_ci_out.to_csv(file_dir + 'pcr_cis.csv')
+    ant_ci_out.to_csv(file_dir + 'ant_cis.csv')
