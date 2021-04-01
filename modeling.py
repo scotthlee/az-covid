@@ -21,7 +21,6 @@ DROP_DISC = True
 USE_TODAY = False
 FIRST_ONLY = True
 NO_PREV = False
-COMBINE = True
 N_BOOT = 100
 ROUND = 2
 
@@ -51,11 +50,13 @@ if FIRST_ONLY:
     records = g.apply(lambda x: x.sort_values(ascending=True,
                                               by=date).head(1))
     file_dir += 'first_only/'
+    df_name += '_first'
 
 # Optionally leaving out folks who were previously positive
 if NO_PREV:
     prev = np.where(records.poscovid != 1)[0]
     records = records.iloc[prev, :]
+    df_name += '_noprev'
 
 # List of symptom names and case definitions
 symptom_list = [
@@ -75,21 +76,20 @@ today_list = [
 # Deciding what variables to include
 var_list = symptom_list
 
-if COMBINE:
-    combined = np.add(records[symptom_list].values,
-                      records[today_list].values)
-    X = np.greater(combined, 0).astype(np.uint8)
+if COMBINED:
+    var_list = [s + '_comb' for s in var_list]
 else:
     if USE_TODAY:
         var_list += today_list
-    X = records[var_list].values.astype(np.uint8)
-
 
 # Loading the arrays and making the targets
 pcr = records.pcr.values
 ant = records.ant.values
 mc = records.multi.values
 mc_names = ['-/-', '+/-', '+/+']
+
+# Saving the modified records to disk
+records.to_csv(file_dir + df_name + '.csv', index=False)
 
 '''Results for PCR'''
 pcr_lgr = LogisticRegression(penalty='none')

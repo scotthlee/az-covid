@@ -91,6 +91,17 @@ records['multi'] = pd.Series(mc)
 records['pcr'] = pd.Series(pcr)
 records['ant'] = pd.Series(ant)
 
+# Combining past and present symptoms
+combined = np.add(records[symptom_list].values,
+                  records[today_list].values)
+X = np.greater(combined, 0).astype(np.uint8)
+records[[s + '_comb' for s in symptom_list]] = X
+
+# Making a binary variable for any symptoms
+records['any_symp'] = np.array(X.sum(axis=1) > 0,
+                               dtype=np.uint8)
+
+
 # Recreating some of the other case defs
 taste = records.losstastesmell.values
 fever = records.fever.values
@@ -107,5 +118,40 @@ mc4 = np.array(taste + sfc > 0, dtype=np.uint8)
 
 records['cc1'] = pd.Series(mc1)
 records['cc4'] = pd.Series(mc4)
+
+# The same for today
+taste = records.losstastesmelltoday.values
+fever = records.fevertoday.values
+sob = records.sobtoday.values
+chills = records.chillstoday.values
+ma = records.muscletoday.values
+
+fc = np.array(fever + chills > 0, dtype=np.uint8)
+sfc = np.array(fc + sob == 2, dtype=np.uint8)
+smfc = np.array(sob + ma + fc > 0, dtype=np.uint8)
+
+mc1 = np.array(taste + smfc > 0, dtype=np.uint8)
+mc4 = np.array(taste + sfc > 0, dtype=np.uint8)
+
+records['cc1_today'] = pd.Series(mc1)
+records['cc4_today'] = pd.Series(mc4)
+
+# And the same for combined
+taste = records.losstastesmell_comb.values
+fever = records.fever_comb.values
+sob = records.sob_comb.values
+chills = records.chills_comb.values
+ma = records.ma_comb.values
+
+fc = np.array(fever + chills > 0, dtype=np.uint8)
+sfc = np.array(fc + sob == 2, dtype=np.uint8)
+smfc = np.array(sob + ma + fc > 0, dtype=np.uint8)
+
+mc1 = np.array(taste + smfc > 0, dtype=np.uint8)
+mc4 = np.array(taste + sfc > 0, dtype=np.uint8)
+
+records['cc1_comb'] = pd.Series(mc1)
+records['cc4_comb'] = pd.Series(mc4)
+
 
 records.to_csv(file_dir + 'records.csv', index=False)
