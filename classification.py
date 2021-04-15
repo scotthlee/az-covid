@@ -6,7 +6,7 @@ import os
 from sklearn.metrics import roc_curve, precision_recall_curve
 from sklearn.metrics import roc_auc_score
 
-from tools import boot_diff_cis, merge_ci_list
+from tools import diff_boot_cis, merge_ci_list
 
 
 # Globals
