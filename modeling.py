@@ -19,7 +19,8 @@ import tools
 UNIX = True
 DROP_DISC = True
 USE_TODAY = False
-FIRST_ONLY = True
+COMBINED = False
+FIRST_ONLY = False
 NO_PREV = False
 N_BOOT = 100
 ROUND = 2
@@ -88,8 +89,7 @@ ant = records.ant.values
 mc = records.multi.values
 mc_names = ['-/-', '+/-', '+/+']
 
-# Saving the modified records to disk
-records.to_csv(file_dir + df_name + '.csv', index=False)
+X = records[var_list].values
 
 '''Results for PCR'''
 pcr_lgr = LogisticRegression(penalty='none')
