@@ -12,6 +12,28 @@ from multiprocessing import Pool
 from copy import deepcopy
 
 
+def vif(df, return_df=True):
+    '''Calculates variance inflation factors (VIFs) a design matrix.
+    
+    Parameters
+      df: the design matrix as a pd.DataFrame with variable/level names as cols
+      return_df: whether to return a pd.DataFrame or just the VIFs
+    
+    Returns
+      the VIFs 
+    '''
+    # Calculating the VIFs
+    R = np.corrcoef(df, rowvar=False)
+    R_inv = np.linalg.inv(R)
+    vif = R_inv.diagonal()
+    
+    if return_df:
+        vif = pd.DataFrame([df.columns.values, vif]).transpose()
+        vif.columns = ['var', 'vif']
+    
+    return vif
+
+
 # Quick function for thresholding probabilities
 def threshold(probs, cutoff=.5):
     return np.array(probs >= cutoff).astype(np.uint8)
@@ -819,4 +841,9 @@ def max_probs(arr, maxes=None, axis=1):
         maxes = np.argmax(arr, axis=axis)
     out = [arr[i, maxes[i]] for i in range(arr.shape[0])]
     return np.array(out)
+
+
+def flatten(l):
+    '''Flattens a list.'''
+    return [item for sublist in l for item in sublist]
 

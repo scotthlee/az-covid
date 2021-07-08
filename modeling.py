@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import statsmodels.formula.api as smf
 import itertools
 import pickle
 import time
@@ -19,7 +20,7 @@ import tools
 UNIX = True
 DROP_DISC = True
 USE_TODAY = False
-COMBINED = False
+COMBINED = True
 FIRST_ONLY = False
 NO_PREV = False
 N_BOOT = 100
@@ -83,11 +84,6 @@ else:
     if USE_TODAY:
         var_list += today_list
 
-# Loading the arrays and making the targets
-pcr = records.pcr.values
-ant = records.ant.values
-mc = records.multi.values
-mc_names = ['-/-', '+/-', '+/+']
 
 X = records[var_list].values
 
@@ -138,18 +134,6 @@ ant_rf_stats = tools.clf_metrics(ant,
                                  mod_name='ant_rf')
 
 '''Results for multiclass'''
-# Multinomial logistic regression
-mc_lgr = LogisticRegression(penalty='none',
-                            max_iter=5000,
-                            n_jobs=-1,
-                            multi_class='multinomial')
-mc_lgr.fit(X, mc)
-mc_coefs = pd.DataFrame(np.exp(mc_lgr.coef_),
-                        columns=var_list)
-mc_coefs['test_result'] = mc_names
-mc_coefs = mc_coefs.transpose()
-mc_coefs.to_csv(file_dir + 'mc_lgr_coefs.csv', index=False)
-
 # And the big random forest
 mc_rf = RandomForestClassifier(n_estimators=10000,
                                n_jobs=-1,
@@ -191,13 +175,15 @@ stats = pd.concat([pcr_rf_stats,
 stats.to_csv(file_dir + 'model_stats.csv', index=False)
 
 '''Getting bootstrap CIs for the multinomial regression'''
+# Running the base model
+mod = sm.MNLogit(records.multi.values, X)
+res = mod.fit()
+
 # Jackknife coefficients
 j_samps = tools.jackknife_sample(X)
-j_mods = [LogisticRegression(penalty='none',
-                             n_jobs=-1,
-                             max_iter=5000).fit(X[j], mc[j]) 
+j_mods = [sm.MNLogit(records.multi.values[j], X[j, :]).fit()
           for j in j_samps]
-j_coefs = [mod.coef_ for mod in j_mods]
+j_coefs = [mod.params for mod in j_mods]
 j_coefs = np.array(j_coefs)
 j_means = j_coefs.mean(axis=0)
 jacks = (j_coefs, j_means)
@@ -205,25 +191,28 @@ jacks = (j_coefs, j_means)
 # Running the bootstrap
 seeds = np.random.randint(1, 1e6, N_BOOT)
 boots = [tools.boot_sample(X, seed=seed) for seed in seeds]
-b_mods = [LogisticRegression(penalty='none', 
-                             n_jobs=-1,
-                             max_iter=5000).fit(X[b], mc[b])
+b_mods = [sm.MNLogit(records.multi.values[b], X[b, :]).fit()
           for b in boots]
-b_coefs = np.array([mod.coef_ for mod in b_mods])
+b_coefs = np.array([mod.params for mod in b_mods])
 
 # Getting the CIs
-bounds = tools.boot_stat_cis(stat=mc_lgr.coef_,
-                          jacks=jacks,
-                          boots=b_coefs,
-                          exp=True)
-stat = pd.DataFrame(np.exp(mc_lgr.coef_), 
-                    columns=symptom_list).round(ROUND).astype(str)
-lower = pd.DataFrame(bounds[0], 
-                     columns=symptom_list).round(ROUND).astype(str)
-upper = pd.DataFrame(bounds[1], 
-                     columns=symptom_list).round(ROUND).astype(str)
-out = stat + ' (' + lower + ', ' + upper + ')'
-out['test_result'] = mc_names
-out = out[['test_result'] + symptom_list].transpose()
-out.to_csv(file_dir + 'lgr_cis.csv')
+bounds = tools.boot_stat_cis(stat=res.params,
+                             jacks=jacks,
+                             boots=b_coefs,
+                             exp=True)
+
+cis = []
+for i in range(bounds.shape[0]):
+    stat = pd.DataFrame(np.exp(res.params[:, i]), 
+                        index=symptom_list).transpose().round(ROUND).astype(str)
+    lower = pd.DataFrame(bounds[0, :, i], 
+                         index=symptom_list).transpose().round(ROUND).astype(str)
+    upper = pd.DataFrame(bounds[1, :, i], 
+                         index=symptom_list).transpose().round(ROUND).astype(str)
+    out = stat + ' (' + lower + ', ' + upper + ')'
+    out['test_result'] = mc_names[i]
+    cis.append(out)
+
+cis = pd.concat(cis, axis=0)
+cis.transpose().to_csv(file_dir + 'lgr_cis.csv', index=False)
 
