@@ -43,8 +43,24 @@ symptom_list = [
     'headache', 'abpain', 'diarrhea', 'losstastesmell', 'fatigue'
 ]
 
+today_list = [
+      'fevertoday', 'chillstoday', 'shivertoday', 'muscletoday', 
+      'congestiontoday', 'sorethroattoday', 'coughtoday', 'sobtoday', 
+      'difficultbreathtoday', 'nauseavomtoday', 'headachetoday', 
+      'abpaintoday', 'diarrheatoday', 'losstastesmelltoday', 
+      'fatiguetoday'
+]
+
+# Deciding what variables to include
+var_list = symptom_list
+
+if COMBINED:
+    var_list = [s + '_comb' for s in var_list]
+else:
+    if USE_TODAY:
+        var_list += today_list
+
 # Making them combined
-var_list = [s + '_comb' for s in symptom_list]
 X = records[var_list].values
 pcr = records.pcr.values
 ant = records.ant.values
@@ -68,6 +84,7 @@ if USE_REV:
              for combos in m_combos]
     m_combos = [[c for j, c in enumerate(combos) if keepers[i][j]]
                 for i, combos in enumerate(m_combos)]
+    symptom_list += ['no_' + s for s in symptom_list]
 
 out = []
 
