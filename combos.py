@@ -14,7 +14,7 @@ import multi
 
 # Globals
 UNIX = True
-DROP_DISC = True
+DROP_DISC = False
 USE_TODAY = False
 USE_REV = True
 COMBINED = False

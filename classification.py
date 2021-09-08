@@ -11,7 +11,7 @@ from tools import diff_boot_cis, merge_ci_list
 
 # Globals
 UNIX = True
-DROP_DISC = True
+DROP_DISC = False
 USE_TODAY = False
 FIRST_ONLY = True
 NO_PREV = False
