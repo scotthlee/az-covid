@@ -13,11 +13,11 @@ import multi
 
 
 # Globals
-UNIX = True
+UNIX = False
 DROP_DISC = False
 USE_TODAY = False
 USE_REV = True
-COMBINED = False
+COMBINED = True
 FIRST_ONLY = False
 NO_PREV = False
 N_BOOT = 100

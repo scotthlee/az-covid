@@ -10,12 +10,12 @@ from tools import diff_boot_cis, merge_ci_list
 
 
 # Globals
-UNIX = True
+UNIX = False
 DROP_DISC = False
 USE_TODAY = False
 FIRST_ONLY = True
 NO_PREV = False
-COMBINE = True
+COMBINED = True
 N_BOOT = 100
 ROUND = 2
 
@@ -65,7 +65,7 @@ today_list = [
       'fatiguetoday'
 ]
 
-if COMBINE:
+if COMBINED:
     combined = np.add(records[symptom_list].values,
                       records[today_list].values)
     records[symptom_list] = np.greater(combined, 0).astype(np.uint8)

@@ -17,7 +17,7 @@ import tools
 
 
 # Globals
-UNIX = True
+UNIX = False
 DROP_DISC = False
 USE_TODAY = False
 COMBINED = True
