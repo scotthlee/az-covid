@@ -125,10 +125,10 @@ cc4 = tools.clf_metrics(pcr, records.cc4_ant)
 cste = tools.clf_metrics(pcr, records.cste_ant)
 def_stats = [taste, cc1, cc4, cste]
 def_names = ['taste', 'cc1', 'cc4', 'cste']
-   
-prev = np.array(out_df.rel_prev_diff - taste.rel_prev_diff.abs())
+
+prev = np.array(out_df.rel_prev_diff.values - taste.rel_prev_diff.abs().values)
 prev = np.array(prev < 0)
-j = np.array((taste.j - out_df.j) < 0)
+j = np.array((taste.j.values - out_df.j.values) < 0)
 out_df['better on prev'] = prev
 out_df['better on j'] = j
 
