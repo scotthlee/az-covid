@@ -10,7 +10,11 @@ from tools import diff_boot_cis, merge_ci_list
 
 
 # Globals
+<<<<<<< HEAD
 UNIX = True
+=======
+UNIX = False
+>>>>>>> f489dad35217f6c30100a1a8e9865a82592a5492
 DROP_DISC = False
 USE_TODAY = False
 FIRST_ONLY = False

@@ -13,11 +13,11 @@ import multi
 
 
 # Globals
-UNIX = True
-DROP_DISC = True
+UNIX = False
+DROP_DISC = False
 USE_TODAY = False
 USE_REV = True
-COMBINED = False
+COMBINED = True
 FIRST_ONLY = False
 NO_PREV = False
 N_BOOT = 100
@@ -43,8 +43,24 @@ symptom_list = [
     'headache', 'abpain', 'diarrhea', 'losstastesmell', 'fatigue'
 ]
 
+today_list = [
+      'fevertoday', 'chillstoday', 'shivertoday', 'muscletoday', 
+      'congestiontoday', 'sorethroattoday', 'coughtoday', 'sobtoday', 
+      'difficultbreathtoday', 'nauseavomtoday', 'headachetoday', 
+      'abpaintoday', 'diarrheatoday', 'losstastesmelltoday', 
+      'fatiguetoday'
+]
+
+# Deciding what variables to include
+var_list = symptom_list
+
+if COMBINED:
+    var_list = [s + '_comb' for s in var_list]
+else:
+    if USE_TODAY:
+        var_list += today_list
+
 # Making them combined
-var_list = [s + '_comb' for s in symptom_list]
 X = records[var_list].values
 pcr = records.pcr.values
 ant = records.ant.values
@@ -68,6 +84,7 @@ if USE_REV:
              for combos in m_combos]
     m_combos = [[c for j, c in enumerate(combos) if keepers[i][j]]
                 for i, combos in enumerate(m_combos)]
+    symptom_list += ['no_' + s for s in symptom_list]
 
 out = []
 
@@ -108,10 +125,10 @@ cc4 = tools.clf_metrics(pcr, records.cc4_ant)
 cste = tools.clf_metrics(pcr, records.cste_ant)
 def_stats = [taste, cc1, cc4, cste]
 def_names = ['taste', 'cc1', 'cc4', 'cste']
-   
-prev = np.array(out_df.rel_prev_diff - taste.rel_prev_diff.abs())
+
+prev = np.array(out_df.rel_prev_diff.values - taste.rel_prev_diff.abs().values)
 prev = np.array(prev < 0)
-j = np.array((taste.j - out_df.j) < 0)
+j = np.array((taste.j.values - out_df.j.values) < 0)
 out_df['better on prev'] = prev
 out_df['better on j'] = j
 
