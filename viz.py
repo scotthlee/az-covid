@@ -4,6 +4,7 @@ import seaborn as sns
 import os
 
 from matplotlib import pyplot as plt
+from sklearn.metrics import roc_auc_curve
 
 import tools
 
@@ -25,33 +26,51 @@ rf_df = pd.read_csv(file_dir + 'rf_records.csv')
 symp_df = pd.read_csv(file_dir + 'symp_combo_stats.csv')
 ant_df = pd.read_csv(file_dir + 'combo_stats.csv')
 
-# Getting stats for the other combos
-taste = tools.clf_metrics(pcr, records.taste_ant) 
-cc1 = tools.clf_metrics(pcr, records.cc1_ant)
-cc4 = tools.clf_metrics(pcr, records.cc4_ant)
-cste = tools.clf_metrics(pcr, records.cste_ant)
-def_stats = [taste, cc1, cc4, cste]
-def_names = ['taste', 'cc1', 'cc4', 'cste']
+# Merging the symptom-only and antigen+symptom combo stats
+symp_df['type'] = 'symptom_only'
+ant_df['type'] = 'symptom_antigen'
+combo_df = pd.concat([symp_df, ant_df], axis=0)
 
-prev = np.array(out_df.rel_prev_diff.values - taste.rel_prev_diff.abs().values)
+# Getting stats for the other combos
+pcr = rf_df.pcr
+ant = rf_df.ant
+taste = tools.clf_metrics(pcr, rf_df.taste_ant) 
+cc1 = tools.clf_metrics(pcr, rf_df.cc1_ant)
+cc4 = tools.clf_metrics(pcr, rf_df.cc4_ant)
+cste = tools.clf_metrics(pcr, rf_df.cste_ant)
+ant_stats = tools.clf_metrics(pcr, ant)
+def_stats = [taste, cc1, cc4, cste, ant_stats]
+def_names = ['taste+ant', 'cc1+ant', 'cc4+ant', 
+             'cste+ant', 'ant_alone']
+
+prev = np.array(combo_df.rel_prev_diff.values - taste.rel_prev_diff.abs().values)
 prev = np.array(prev < 0)
-j = np.array((taste.j.values - out_df.j.values) < 0)
-out_df['better on prev'] = prev
-out_df['better on j'] = j
+j = np.array((taste.j.values - combo_df.j.values) < 0)
+combo_df['better on prev'] = prev
+combo_df['better on j'] = j
+
+# Doing the ROC curves
+symp_auc = roc_curve(pcr, rf_df.rf_symp_prob)
+ant_auc = roc_curve(pcr, rf_df.rf_sympant_prob)
 
 # Plotting TPR and FPR with color by prevalence accuracy
 cb = sns.color_palette('colorblind')
 sns.set_style('dark')
 sns.set_palette('colorblind')
-ax = sns.scatterplot(x=(1 - out_df.spec),
-                y=out_df.sens,
-                size=out_df['better on prev'],
-                hue=out_df['better on j'],
-                palette='colorblind',
-                s=10,
-                alpha=.4) 
+ax = sns.scatterplot(x=(1 - combo_df.spec),
+                     y=combo_df.sens,
+                     size=combo_df['better on prev'],
+                     hue=combo_df['better on j'],
+                     style=combo_df['type'],
+                     palette='colorblind',
+                     s=10,
+                     alpha=.4) 
 ax.set(xlabel='false positive rate',
        ylabel='true positive rate')
+
+# Adding the ROC curves
+plt.plot(symp_auc[0], symp_auc[1], color='darkgray')
+plt.plot(ant_auc[0], ant_auc[1], color='black')
 
 # Adding points for the other combinations
 for i, df in enumerate(def_stats):
