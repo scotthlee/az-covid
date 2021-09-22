@@ -25,6 +25,7 @@ FIRST_ONLY = False
 NO_PREV = False
 N_BOOT = 100
 ROUND = 2
+TRAIN = False
 
 # Using multiprocessing on Mac/Linux
 if UNIX:
@@ -37,7 +38,11 @@ else:
 # Importing the original data
 file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
 dir_files = os.listdir(file_dir)
-records = pd.read_csv(file_dir + 'records.csv')
+
+if TRAIN:
+    records = pd.read_csv(file_dir + 'records.csv')
+else:
+    records = pd.read_csv(file_dir + 'combo_records.csv')
 
 # List of symptom names and case definitions
 symptom_list = [
@@ -70,33 +75,55 @@ ant = records.ant.values
 X_ant = np.concatenate((X, ant.reshape(-1, 1)), axis=1)
 
 # Training RFs with and without antigen as a predictor
-rf = RandomForestClassifier(n_estimators=10000, 
-                            n_jobs=-1, 
-                            oob_score=True)
-rf.fit(X, pcr)
-rf_probs = rf.oob_decision_function_[:, 1]
-
-rf_ant = RandomForestClassifier(n_estimators=10000,
-                                n_jobs=-1,
+if TRAIN:
+    rf = RandomForestClassifier(n_estimators=10000, 
+                                n_jobs=-1, 
                                 oob_score=True)
-rf_ant.fit(X_ant, pcr)
-rf_ant_probs = rf_ant.oob_decision_function_[:, 1]
+    rf.fit(X, pcr)
+    probs = rf.oob_decision_function_[:, 1]
+
+    rf_ant = RandomForestClassifier(n_estimators=10000,
+                                    n_jobs=-1,
+                                    oob_score=True)
+    rf_ant.fit(X_ant, pcr)
+    ant_probs = rf_ant.oob_decision_function_[:, 1]
+else:
+    probs = records.rf_symp_prob
+    ant_probs = records.rf_sympant_prob
 
 # Using leave-one-out to select thresholds for max J
 loo = LeaveOneOut()
-rf_preds = np.zeros(X.shape[0])
-rf_ant_preds = np.zeros(X.shape[0])
+j_preds = np.zeros(X.shape[0])
+j_ant_preds = np.zeros(X.shape[0])
+f1_preds = np.zeros(X.shape[0])
+f1_ant_preds = np.zeros(X.shape[0])
 
+# Running the loop; this takes a while
 for train, test in loo.split(X, pcr):
-    rf_gm = tools.grid_metrics(pcr[train], 
-                               rf_probs[train])
-    rf_cut = rf_gm.cutoff.values[rf_gm.j.argmax()]
-    rf_preds[test] = tools.threshold(rf_probs[test], 
-                                    rf_cut)
+    gm = tools.grid_metrics(pcr[train], 
+                            probs[train])
+    j_cut = gm.cutoff.values[gm.j.argmax()]
+    f1_cut = gm.cutoff.values[gm.f1.argmax()]
+    j_preds[test] = tools.threshold(probs[test],
+                                    j_cut)
+    f1_preds[test] = tools.threshold(probs[test],
+                                     f1_cut)
     
-    rf_ant_gm = tools.grid_metrics(pcr[train], 
-                                   rf_ant_probs[train])
-    rf_ant_cut = rf_ant_gm.cutoff.values[rf_ant_gm.j.argmax()]
-    rf_ant_preds[test] = tools.threshold(rf_ant_probs[test], 
-                                         rf_ant_cut)
+    ant_gm = tools.grid_metrics(pcr[train], 
+                                ant_probs[train])
+    j_ant_cut = ant_gm.cutoff.values[ant_gm.j.argmax()]
+    f1_ant_cut = ant_gm.cutoff.values[ant_gm.f1.argmax()]
+    j_ant_preds[test] = tools.threshold(ant_probs[test],
+                                        j_ant_cut)
+    f1_ant_preds[test] = tools.threshold(ant_probs[test],
+                                         f1_ant_cut)
+
+# Adding the predictions onto the original dataset
+records.rf_j_pred = j_preds.astype(np.uint8)
+records.rf_f1_pred = f1_preds.astype(np.uint8)
+records.rf_ant_j_pred = j_ant_preds.astype(np.uint8)
+records.rf_ant_f1_pred = f1_ant_preds.astype(np.uint8)
+
+# And then saving the dataset to disk
+records.to_csv(file_dir + 'rf_records.csv', index=False)
 
