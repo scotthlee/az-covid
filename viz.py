@@ -10,7 +10,7 @@ import tools
 
 
 # Globals
-UNIX = True
+UNIX = False
 
 # Using multiprocessing on Mac/Linux
 if UNIX:
@@ -23,13 +23,7 @@ else:
 # Importing the original data
 file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
 rf_df = pd.read_csv(file_dir + 'rf_records.csv')
-symp_df = pd.read_csv(file_dir + 'symp_combo_stats.csv')
-ant_df = pd.read_csv(file_dir + 'combo_stats.csv')
-
-# Merging the symptom-only and antigen+symptom combo stats
-symp_df['type'] = 'symptoms only'
-ant_df['type'] = 'symptoms and antigen'
-combo_df = pd.concat([symp_df, ant_df], axis=0)
+combo_df = pd.read_csv(file_dir + 'combo_stats.csv')
 
 # Getting stats for the other combos
 pcr = rf_df.pcr
