@@ -26,7 +26,7 @@ rf_df = pd.read_csv(file_dir + 'rf_records.csv')
 combo_df = pd.read_csv(file_dir + 'combo_stats.csv')
 
 # Converting specificity to FPR to make plotting easier
-combo_df['fpr'] - 1 - combo_df.spec
+combo_df['fpr'] = 1 - combo_df.spec
 
 # Getting stats for the other combos
 pcr = rf_df.pcr
@@ -48,9 +48,9 @@ combo_df['better on j'] = j
 
 # Doing the ROC curves
 symp_rocs = [roc_curve(pcr, rf_df['symp_' + str(i) + '_prob'])
-             for i in range(2, 15)]
+             for i in range(1, 15)]
 ant_rocs = [roc_curve(pcr, rf_df['ant_' + str(i) + '_prob'])
-             for i in range(2, 16)]
+             for i in range(1, 16)]
 
 # Plotting TPR and FPR with color by prevalence accuracy
 cr = sns.color_palette('crest')
@@ -63,7 +63,7 @@ rp = sns.relplot(x='fpr',
                  palette='crest')
 rp.fig.set_tight_layout(True)
 
-for n, ax in enumerate(rp.axes[0][1:]):
+for n, ax in enumerate(rp.axes[0]):
     ax.plot(symp_rocs[n][0], 
             symp_rocs[n][1],
             alpha=0.5,
@@ -74,14 +74,17 @@ for n, ax in enumerate(rp.axes[0][1:]):
             color=cr[4])
     ax.set_xlim((0, 0.4))
 
-    # Adding points for the other combinations
-    '''
-    for i, df in enumerate(def_stats):
-        fpr = 1 - df.spec
-        tpr = df.sens
-        plt.scatter(x=fpr, y=tpr, color=cb[2])
-        plt.text(x=fpr, y=tpr, s=def_names[i])
-        '''
-    title = 'n = ' + str(n)
-    plt.title(title)
-    plt.show()
+plt.show()
+
+# Adding points for the other combinations
+'''
+for i, df in enumerate(def_stats):
+    fpr = 1 - df.spec
+    tpr = df.sens
+    plt.scatter(x=fpr, y=tpr, color=cb[2])
+    plt.text(x=fpr, y=tpr, s=def_names[i])
+
+title = 'n = ' + str(n)
+plt.title(title)
+plt.show()
+'''
