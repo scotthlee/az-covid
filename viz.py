@@ -25,6 +25,9 @@ file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
 rf_df = pd.read_csv(file_dir + 'rf_records.csv')
 combo_df = pd.read_csv(file_dir + 'combo_stats.csv')
 
+# Converting specificity to FPR to make plotting easier
+combo_df['fpr'] - 1 - combo_df.spec
+
 # Getting stats for the other combos
 pcr = rf_df.pcr
 ant = rf_df.ant
@@ -44,36 +47,41 @@ combo_df['better on prev'] = prev
 combo_df['better on j'] = j
 
 # Doing the ROC curves
-symp_roc = roc_curve(pcr, rf_df.rf_symp_prob)
-ant_roc = roc_curve(pcr, rf_df.rf_sympant_prob)
+symp_rocs = [roc_curve(pcr, rf_df['symp_' + str(i) + '_prob'])
+             for i in range(2, 15)]
+ant_rocs = [roc_curve(pcr, rf_df['ant_' + str(i) + '_prob'])
+             for i in range(2, 16)]
 
 # Plotting TPR and FPR with color by prevalence accuracy
-cb = sns.color_palette('colorblind')
-sns.set_style('dark')
-sns.set_palette('colorblind')
-ax = sns.scatterplot(x=(1 - combo_df.spec),
-                     y=combo_df.sens,
-                     hue=combo_df.type,
-                     palette='colorblind',
-                     s=10,
-                     alpha=.4) 
-ax.set(xlabel='false positive rate',
-       ylabel='true positive rate')
+cr = sns.color_palette('crest')
+rp = sns.relplot(x='fpr', 
+                 y='sens', 
+                 hue='m', 
+                 col='n', 
+                 data=combo_df,
+                 kind='scatter',
+                 palette='crest')
+rp.fig.set_tight_layout(True)
 
-# Adding the ROC curves
-sns.lineplot(x=symp_roc[0], 
-             y=symp_roc[1], 
-             palette='colorblind')
-sns.lineplot(x=ant_roc[0], 
-             y=ant_roc[1], 
-             palette='colorblind')
+for n, ax in enumerate(rp.axes[0][1:]):
+    ax.plot(symp_rocs[n][0], 
+            symp_rocs[n][1],
+            alpha=0.5,
+            color=cr[4])
+    ax.plot(ant_rocs[n][0], 
+            ant_rocs[n][1],
+            alpha=0.5,
+            color=cr[4])
+    ax.set_xlim((0, 0.4))
 
-# Adding points for the other combinations
-for i, df in enumerate(def_stats):
-    fpr = 1 - df.spec
-    tpr = df.sens
-    plt.scatter(x=fpr, y=tpr, color=cb[2])
-    plt.text(x=fpr, y=tpr, s=def_names[i])
-
-plt.title('combos and the RF in ROC space')
-plt.show()
+    # Adding points for the other combinations
+    '''
+    for i, df in enumerate(def_stats):
+        fpr = 1 - df.spec
+        tpr = df.sens
+        plt.scatter(x=fpr, y=tpr, color=cb[2])
+        plt.text(x=fpr, y=tpr, s=def_names[i])
+        '''
+    title = 'n = ' + str(n)
+    plt.title(title)
+    plt.show()
