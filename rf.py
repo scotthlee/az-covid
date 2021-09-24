@@ -68,7 +68,7 @@ ant = records.ant.values
 X_ant = np.concatenate((X, ant.reshape(-1, 1)), axis=1)
 
 # Training RFs with and without antigen as a predictor
-for m in range(2, X_ant.shape[1]):
+for m in range(1, X_ant.shape[1]):
     s = 'training forests with max depth of ' + str(m)
     print(s)
     
