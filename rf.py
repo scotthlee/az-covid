@@ -68,21 +68,20 @@ ant = records.ant.values
 X_ant = np.concatenate((X, ant.reshape(-1, 1)), axis=1)
 
 # Training RFs with and without antigen as a predictor
-for m in range(1, X_ant.shape[1]):
+for m in range(1, 6):
     s = 'training forests with max depth of ' + str(m)
     print(s)
     
-    if m < X.shape[1]:
-        rf = RandomForestClassifier(n_estimators=10000,
-                                    max_depth=m, 
-                                    n_jobs=-1, 
-                                    oob_score=True)
-        rf.fit(X, pcr)
-        probs = rf.oob_decision_function_[:, 1]
-        records['symp_' + str(m) + '_prob'] = probs
-        
+    rf = RandomForestClassifier(n_estimators=10000,
+                                max_depth=m, 
+                                n_jobs=-1, 
+                                oob_score=True)
+    rf.fit(X, pcr)
+    probs = rf.oob_decision_function_[:, 1]
+    records['symp_' + str(m) + '_prob'] = probs
+    
     rf_ant = RandomForestClassifier(n_estimators=10000,
-                                    max_depth=m,
+                                    max_depth=m+1,
                                     n_jobs=-1,
                                     oob_score=True)
     rf_ant.fit(X_ant, pcr)

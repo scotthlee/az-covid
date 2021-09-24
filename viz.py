@@ -48,9 +48,9 @@ combo_df['better on j'] = j
 
 # Doing the ROC curves
 symp_rocs = [roc_curve(pcr, rf_df['symp_' + str(i) + '_prob'])
-             for i in range(1, 15)]
+             for i in range(1, 6)]
 ant_rocs = [roc_curve(pcr, rf_df['ant_' + str(i) + '_prob'])
-             for i in range(1, 16)]
+             for i in range(1, 6)]
 
 # Plotting TPR and FPR with color by prevalence accuracy
 cr = sns.color_palette('crest')
