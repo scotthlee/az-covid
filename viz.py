@@ -40,20 +40,17 @@ def_names = ['taste', 'cc1', 'cc4',
              'cste', 'taste+ant', 'cc1+ant', 
              'cc4+ant', 'cste+ant', 'ant_alone']
 
-prev = np.array(combo_df.rel_prev_diff.values - taste.rel_prev_diff.abs().values)
-prev = np.array(prev < 0)
-j = np.array((taste.j.values - combo_df.j.values) < 0)
-combo_df['better on prev'] = prev
-combo_df['better on j'] = j
-
 # Doing the ROC curves
 symp_rocs = [roc_curve(pcr, rf_df['symp_' + str(i) + '_prob'])
              for i in range(1, 6)]
 ant_rocs = [roc_curve(pcr, rf_df['ant_' + str(i) + '_prob'])
              for i in range(1, 6)]
 
-# Plotting TPR and FPR with color by prevalence accuracy
+# Plotting combo and RF ROCs as a function of n and m
+sns.set_style('darkgrid')
 cr = sns.color_palette('crest')
+cb = sns.color_palette('colorblind')
+
 rp = sns.relplot(x='fpr', 
                  y='sens', 
                  hue='m', 
@@ -76,15 +73,33 @@ for n, ax in enumerate(rp.axes[0]):
 
 plt.show()
 
-# Adding points for the other combinations
-'''
+# Plotting case definitions against combos
+sns.scatterplot(x='fpr', 
+                y='sens', 
+                data=combo_df, 
+                hue='type',
+                alpha=0.4,
+                palette='colorblind')
+
 for i, df in enumerate(def_stats):
+    if 'ant' in def_names[i]:
+        col = cb[2]
+    else:
+        col = cb[2]
+    
     fpr = 1 - df.spec
     tpr = df.sens
-    plt.scatter(x=fpr, y=tpr, color=cb[2])
+    plt.scatter(x=fpr, y=tpr, color=col)
     plt.text(x=fpr, y=tpr, s=def_names[i])
 
-title = 'n = ' + str(n)
-plt.title(title)
+plt.tight_layout()
 plt.show()
+
 '''
+prev = np.array(combo_df.rel_prev_diff.values - taste.rel_prev_diff.abs().values)
+prev = np.array(prev < 0)
+j = np.array((taste.j.values - combo_df.j.values) < 0)
+combo_df['better on prev'] = prev
+combo_df['better on j'] = j
+'''
+
