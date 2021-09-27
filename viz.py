@@ -31,7 +31,7 @@ combo_df['fpr'] = 1 - combo_df.spec
 # Getting stats for the other combos
 pcr = rf_df.pcr
 ant = rf_df.ant
-def_cols = [rf_df.losstastesmell, rf_df.cc1, rf_df.cc4, 
+def_cols = [rf_df.losstastesmell_comb, rf_df.cc1_comb, rf_df.cc4_comb, 
             rf_df.CSTE, rf_df.taste_ant, rf_df.cc1_ant, 
             rf_df.cc4_ant, rf_df.cste_ant]
 def_stats = [tools.clf_metrics(pcr, d) for d in def_cols]

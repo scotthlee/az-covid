@@ -138,13 +138,14 @@ records['cc4_today'] = pd.Series(mc4)
 
 # And the same for combined
 taste = records.losstastesmell_comb.values
+breath = records.difficultbreath_comb.values
 fever = records.fever_comb.values
 sob = records.sob_comb.values
 chills = records.chills_comb.values
 ma = records.ma_comb.values
 
 fc = np.array(fever + chills > 0, dtype=np.uint8)
-sfc = np.array(fc + sob == 2, dtype=np.uint8)
+sfc = np.array(fc + sob + breath + ma >= 3, dtype=np.uint8)
 smfc = np.array(sob + ma + fc > 0, dtype=np.uint8)
 
 mc1 = np.array(taste + smfc > 0, dtype=np.uint8)
