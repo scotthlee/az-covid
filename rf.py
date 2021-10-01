@@ -22,7 +22,7 @@ USE_TODAY = False
 COMBINED = True
 FIRST_ONLY = False
 NO_PREV = False
-MAX_M = 5
+MAX_N = 5
 
 # Using multiprocessing on Mac/Linux
 if UNIX:
@@ -67,8 +67,10 @@ pcr = records.pcr.values
 ant = records.ant.values
 X_ant = np.concatenate((X, ant.reshape(-1, 1)), axis=1)
 
+fts = []
+
 # Training RFs with and without antigen as a predictor
-for m in range(1, 6):
+for m in range(1, MAX_N + 1):
     s = 'training forests with max depth of ' + str(m)
     print(s)
     
@@ -87,6 +89,7 @@ for m in range(1, 6):
     rf_ant.fit(X_ant, pcr)
     ant_probs = rf_ant.oob_decision_function_[:, 1]
     records['ant_' + str(m) + '_prob'] = ant_probs
+    fts.append(np.argsort(rf_ant.feature_importances_)[::-1])
 
 # And then saving the dataset to disk
 records.to_csv(file_dir + 'rf_records.csv', index=False)
