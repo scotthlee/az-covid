@@ -33,12 +33,16 @@ pcr = rf_df.pcr
 ant = rf_df.ant
 def_cols = [rf_df.losstastesmell_comb, rf_df.cc1_comb, rf_df.cc4_comb, 
             rf_df.CSTE, rf_df.taste_ant, rf_df.cc1_ant, 
-            rf_df.cc4_ant, rf_df.cste_ant]
+            rf_df.cc4_ant, rf_df.cste_ant, rf_df.s95,
+            rf_df.sa95, rf_df.s90, rf_df.sa90,
+            rf_df.s80, rf_df.sa80]
 def_stats = [tools.clf_metrics(pcr, d) for d in def_cols]
 def_stats.append(tools.clf_metrics(pcr, ant))
 def_names = ['taste', 'cc1', 'cc4',
              'cste', 'taste+ant', 'cc1+ant', 
-             'cc4+ant', 'cste+ant', 'ant_alone']
+             'cc4+ant', 'cste+ant', 's95', 
+             's95+ant', 's90', 's90+ant',
+             's80', 's80+ant', 'ant_alone']
 
 # Doing the ROC curves
 symp_rocs = [roc_curve(pcr, rf_df['symp_' + str(i) + '_prob'])
@@ -92,6 +96,8 @@ for i, df in enumerate(def_stats):
     plt.scatter(x=fpr, y=tpr, color=col)
     plt.text(x=fpr, y=tpr, s=def_names[i])
 
+plt.xlabel('1 - specificity')
+plt.ylabel('sensitivity')
 plt.tight_layout()
 plt.show()
 
