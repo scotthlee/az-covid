@@ -164,3 +164,34 @@ out = pd.concat([pd.concat([pd.concat(df, axis=0) for df in symp_out]),
                  pd.concat([pd.concat(df, axis=0) for df in exp_out])], 
                 axis=0)
 out.to_csv(file_dir + 'combo_stats.csv', index=False)
+
+# Adding the best-performing definitions to the main file
+taste = records.losstastesmell_comb.values
+fever = records.fever_comb.values
+head = records.headache_comb.values
+chills = records.chills_comb.values
+ma = records.ma_comb.values
+shiver = records.shiver_comb.values
+breath = records.difficultbreath_comb.values
+cough = records.cough_comb.values
+fatigue = records.fatigue_comb.values
+
+# Reconstructing some candidate definitions
+s95 = np.array(head + fever + taste >= 2, dtype=np.uint8)
+sa95 = np.array((shiver + head + taste >= 2) | (ant == 1),
+                dtype=np.uint8)
+
+s90 = np.array(fever + chills + taste >= 1, dtype=np.uint8)
+sa90 = np.array((breath + chills + taste >=1) | (ant == 1),
+                dtype=np.uint8)
+
+s80 = np.array(fever + chills + cough + ma + taste >= 1, dtype=np.uint8)
+sa80 = np.array((fever + chills + fatigue + ma + taste >= 1) | (ant == 1),
+                dtype=np.uint8)
+
+candidates = [s95, sa95, s90, sa90, s80, sa80]
+cand_names = ['s95', 'sa95', 's90', 'sa90', 's80', 'sa80']
+for i, cn in enumerate(cand_names):
+    records[cn] = candidates[i]
+
+records.to_csv(file_dir + 'records.csv', index=False)

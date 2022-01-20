@@ -20,15 +20,13 @@ from sklearn.metrics import roc_auc_score
 import tools
 
 
-UNIX = True
+UNIX = False
 
 # Using multiprocessing on Mac/Linux
 if UNIX:
     base_dir = '/Users/scottlee/'
-    from multi import boot_cis
 else:
     base_dir = 'C:/Users/yle4/'
-    from tools import boot_cis
 
 # Importing the original data
 file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
