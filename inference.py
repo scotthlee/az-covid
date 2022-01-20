@@ -66,7 +66,6 @@ breath = records.difficultbreath_comb.values
 cough = records.cough_comb.values
 fatigue = records.fatigue_comb.values
 
-
 # Reconstructing some candidate definitions
 s95 = np.array(head + fever + taste >= 2, dtype=np.uint8)
 sa95 = np.array((shiver + head + taste >= 2) | (ant == 1),
@@ -94,8 +93,8 @@ cc1a_cis = multi.boot_cis(pcr, (records.cc1) | (ant == 1))
 cc4_cis = multi.boot_cis(pcr, records.cc4)
 cc4a_cis = multi.boot_cis(pcr, (records.cc4) | (ant == 1))
 
-cste_cis = multi.boot_cis(pcr, records.CSTE)
-cstea_cis = multi.boot_cis(pcr, (records.CSTE) | (ant == 1))
+cste_cis = multi.boot_cis(pcr, records.cste_new)
+cstea_cis = multi.boot_cis(pcr, (records.cste_new) | (ant == 1))
 
 def_names = ['cc1', 'cc1a', 'cc4', 'cc4a', 'cste', 'cstea']
 def_cis = [cc1_cis, cc1a_cis, cc4_cis, cc4a_cis, cste_cis, cstea_cis]
@@ -112,8 +111,5 @@ with open(file_dir + 'pkl/cis.pkl', 'wb') as f:
 ci_tab = tools.merge_ci_list(all_cis, round=2)
 ci_tab['rule'] = all_names
 ci_tab.to_csv(file_dir + 'compound_cis.csv', index=False)
-
-# Getting diffs for key inferences
-
 
 

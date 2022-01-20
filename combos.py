@@ -20,6 +20,7 @@ USE_REV = False
 COMBINED = True
 FIRST_ONLY = False
 NO_PREV = False
+USE_CONTACT = True
 
 # Using multiprocessing on Mac/Linux
 if UNIX:
@@ -56,12 +57,14 @@ if COMBINED:
     var_list = [s + '_comb' for s in var_list]
 else:
     if USE_TODAY:
-        var_list += today_list
+        var_list += today_list    
 
 # Making them combined
 X = records[var_list].values
 pcr = records.pcr.values
 ant = records.ant.values
+exp = np.array(records.closecontact.values == 1,
+               dtype=np.uint8)
 
 # Making a reversed X
 if USE_REV:
@@ -122,13 +125,34 @@ for i, combos in enumerate(n_combos):
         c_out.append(res)
     ant_out.append(c_out)
 
+# And then again (optionally) with exposure information
+if USE_CONTACT:
+    exp_out = []
+    for i, combos in enumerate(n_combos):
+        c_out = []
+        X_combos = [X[:, c] for c in combos]
+        for m in range(len(combos[0])):
+            inputs = [(pcr, np.array(
+                np.array(np.array(np.sum(x, axis=1) > m, dtype=np.uint8) 
+                         + exp > 1, dtype=np.uint8)
+                 + ant > 0, dtype=np.uint8))
+                       for x in X_combos]
+            with Pool() as p:
+                res = pd.concat(p.starmap(tools.clf_metrics, inputs),
+                           axis=0)
+            res['m'] = m
+            res['n'] = i
+            res['type'] = 's_and_exp_or_antigen'
+            c_out.append(res)
+        exp_out.append(c_out)
+
 # Getting the combo names
 combo_names = [[' '.join([symptom_list[i] for i in c])
                 for c in combos]
                for combos in n_combos]
 
 # Filling in the combo names
-for out in [symp_out, ant_out]:
+for out in [symp_out, ant_out, exp_out]:
     for i, dfs in enumerate(out):
         for j in range(len(dfs)):
             dfs[j]['rule'] = [str(j + 1) + ' of ' + s
@@ -136,6 +160,7 @@ for out in [symp_out, ant_out]:
 
 # Combining the two into one
 out = pd.concat([pd.concat([pd.concat(df, axis=0) for df in symp_out]),
-                 pd.concat([pd.concat(df, axis=0) for df in ant_out])], 
+                 pd.concat([pd.concat(df, axis=0) for df in ant_out]),
+                 pd.concat([pd.concat(df, axis=0) for df in exp_out])], 
                 axis=0)
 out.to_csv(file_dir + 'combo_stats.csv', index=False)

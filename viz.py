@@ -31,18 +31,22 @@ combo_df['fpr'] = 1 - combo_df.spec
 # Getting stats for the other combos
 pcr = rf_df.pcr
 ant = rf_df.ant
-def_cols = [rf_df.losstastesmell_comb, rf_df.cc1_comb, rf_df.cc4_comb, 
-            rf_df.CSTE, rf_df.taste_ant, rf_df.cc1_ant, 
-            rf_df.cc4_ant, rf_df.cste_ant, rf_df.s95,
-            rf_df.sa95, rf_df.s90, rf_df.sa90,
-            rf_df.s80, rf_df.sa80]
+def_cols = [
+    rf_df.losstastesmell_comb, rf_df.cc1_comb, rf_df.cc4_comb, 
+    rf_df.cste_new, rf_df.taste_ant, rf_df.cc1_ant, 
+    rf_df.cc4_ant, rf_df.s95, rf_df.sa95, 
+    rf_df.s90, rf_df.sa90, rf_df.s80, 
+    rf_df.sa80
+]
 def_stats = [tools.clf_metrics(pcr, d) for d in def_cols]
 def_stats.append(tools.clf_metrics(pcr, ant))
-def_names = ['taste', 'cc1', 'cc4',
-             'cste', 'taste+ant', 'cc1+ant', 
-             'cc4+ant', 'cste+ant', 's95', 
-             's95+ant', 's90', 's90+ant',
-             's80', 's80+ant', 'ant_alone']
+def_names = [
+    'taste', 'Reses1', 'Reses4',
+    'CSTE', 'taste+ant', 'Reses1+ant', 
+    'Reses4+ant', 's95', 's95+ant',
+    's90', 's90+ant', 's80',
+    's80+ant', 'ant_alone'
+]
 
 # Doing the ROC curves
 symp_rocs = [roc_curve(pcr, rf_df['symp_' + str(i) + '_prob'])
@@ -62,6 +66,7 @@ rp = sns.relplot(x='fpr',
                  data=combo_df,
                  kind='scatter',
                  palette='crest')
+rp.set(xlim=(0, 1), ylim=(0, 1))
 rp.fig.set_tight_layout(True)
 
 for n, ax in enumerate(rp.axes[0]):
@@ -87,17 +92,17 @@ sns.scatterplot(x='fpr',
 
 for i, df in enumerate(def_stats):
     if 'ant' in def_names[i]:
-        col = cb[2]
+        col = cb[3]
     else:
-        col = cb[2]
+        col = cb[3]
     
     fpr = 1 - df.spec
     tpr = df.sens
     plt.scatter(x=fpr, y=tpr, color=col)
     plt.text(x=fpr, y=tpr, s=def_names[i])
 
-plt.xlabel('1 - specificity')
-plt.ylabel('sensitivity')
+plt.xlabel('1 - Specificity')
+plt.ylabel('Sensitivity')
 plt.tight_layout()
 plt.show()
 

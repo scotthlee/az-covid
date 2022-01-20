@@ -154,5 +154,28 @@ mc4 = np.array(taste + sfc > 0, dtype=np.uint8)
 records['cc1_comb'] = pd.Series(mc1)
 records['cc4_comb'] = pd.Series(mc4)
 
+# Redoing the CSTE definition with the latest symptoms
+contact = np.array(records.closecontact.values == 1,
+                   dtype=np.uint8)
+
+shiver = records.shiver_comb.values
+headache = records.headache_comb.values
+throat = records.sorethroat_comb.values
+naus = records.nauseavom_comb.values
+diarrhea = records.diarrhea_comb.values
+fatigue = records.fatigue_comb.values
+congestion = records.congestion_comb.values
+cough = records.cough_comb.values
+
+part1 = np.array(fever + chills + shiver + ma + headache + throat + 
+                 naus + diarrhea + fatigue + congestion > 1,
+                 dtype=np.uint8)
+part2 = np.array(cough + sob + breath + taste > 0, dtype=np.uint8)
+clinical = np.array(part1 + part2 > 0, dtype=np.uint8)
+crit1 = np.array(clinical + contact == 2, dtype=np.uint8)
+
+records['cste_clin_exp'] = crit1
+records['cste_new'] = np.array(crit1 + ant > 0, dtype=np.uint8)
+
 
 records.to_csv(file_dir + 'records.csv', index=False)
