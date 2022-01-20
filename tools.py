@@ -434,7 +434,9 @@ class boot_cis:
         seeds = np.random.randint(0, 1e6, n)
 
         # Generating the bootstrap samples and metrics
-        boots = [boot_sample(targets, seed=seed) for seed in seeds]
+        boots = [boot_sample(targets, 
+                             by=group, 
+                             seed=seed) for seed in seeds]
         scores = [clf_metrics(targets[b], 
                               guesses[b], 
                               average=average) for b in boots]
@@ -591,12 +593,11 @@ def boot_sample(df,
     else:
         levels = np.unique(by)
         n_levels = len(levels)
-        level_idx = [np.where(by == level)[0]
+        level_ids = [np.where(by == level)[0]
                      for level in levels]
-        boot = np.random.choice(range(n_levels),
-                                size=n_levels,
-                                replace=True)
-        boot = np.concatenate([level_idx[i] for i in boot]).ravel()
+        boot = [np.random.choice(ids, size=len(ids), replace=True)
+                for ids in level_ids]
+        boot = np.concatenate(boot).ravel()
     
     if not return_df:
         return boot
