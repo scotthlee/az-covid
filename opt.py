@@ -4,11 +4,11 @@ def smash_log(x, B=10, d=0):
 
 def j(z, xp, xn, m):
     z = np.round(z)
-    sens = 1/xp.shape[0] * np.array(np.dot(xp, z) >= m, dtype=np.uint8).sum()
-    fpr = 1/xn.shape[0] * np.array(np.dot(xn, z) >= m, dtype=np.uint8).sum()
+    sens = np.sum(np.dot(xp, z) >= m, dtype=np.uint8) / xp.shape[0]
+    fpr = np.sum(np.dot(xn, z) >= m, dtype=np.uint8) / xn.shape[0]
     spec = 1 - fpr
-    print(sens, fpr)
-    return -1 * (sens + spec - 1)
+    print(sens, spec)
+    return sens + spec - 1
 
 def j_exp(z, xp, xn, m, a=1, b=1):
     tpr = smash_log(np.dot(xp, z) - (m - 1)).sum() / xp.shape[0]
