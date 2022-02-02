@@ -218,7 +218,7 @@ divs = [1 / xp.shape[0]] * xp.shape[0]
 divs += [1 / xn.shape[0]] * xn.shape[0]
 obj = np.concatenate([np.zeros(Ns),
                       np.zeros(1),
-                      np.ones(N)])
+                      np.array(divs)])
 
 opt = sp.optimize.linprog(
     c=obj,
@@ -229,8 +229,8 @@ opt = sp.optimize.linprog(
 )
 
 # Trying with or tools
-divs = [1 / xp.shape[0]] * xp.shape[0]
-divs += [1 / xn.shape[0]] * xn.shape[0]
+divs = [1 / (xp.shape[0] / 10000)] * xp.shape[0]
+divs += [1 / (xn.shape[0] / 10000)] * xn.shape[0]
 obj = np.concatenate([np.zeros(Ns),
                       np.zeros(1),
                       np.array(divs)])
