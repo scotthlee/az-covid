@@ -13,6 +13,41 @@ import tools
 import multi
 
 
+def smash_log(x, B=10, d=0):
+    return 1 / (1 + np.exp(-x * B)) - d
+
+
+def j_lin(z, xp, xn, m):
+    z = np.round(z)
+    tpr = np.sum(np.dot(xp, z) >= m) / xp.shape[0]
+    fpr = np.sum(np.dot(xn, z) >= m) / xn.shape[0]
+    print(tpr, fpr)
+    return tpr - fpr
+
+
+def j_exp(z, xp, xn, a=1, b=1):
+    m = z[-1]
+    z = z[:-1]
+    tpr = smash_log(np.dot(xp, z) - m).sum() / xp.shape[0]
+    fpr = smash_log(np.dot(xn, z) - m).sum() / xn.shape[0]
+    return -1 * (a*tpr - b*fpr)
+
+
+def j_exp_comp(z, xp, xn, c=2, a=1, b=1):
+    s = xp.shape[1]
+    m = z[-c:]
+    z = z[:-c]
+    zmat = z.reshape((s, c), order='F')
+    
+    p_hits = smash_log(smash_log(np.dot(xp, zmat) - m).sum(1) - .5).sum()
+    n_hits = smash_log(smash_log(np.dot(xn, zmat) - m).sum(1) - .5).sum()
+    
+    tpr = p_hits / xp.shape[0]
+    fpr = n_hits / xn.shape[0] 
+    
+    return -1 * (a*tpr - b*fpr)
+
+
 # Globals
 UNIX = True
 USE_TODAY = False
@@ -70,29 +105,11 @@ y = np.concatenate([y[pos], y[neg]], axis=0)
 xp = X[:len(pos), :]
 xn = X[len(pos):, :]
 
-# Defining some useful functions
-def smash_log(x, B=10, d=0):
-    return 1 / (1 + np.exp(-x * B)) - d
-
-def j_lin(z, xp, xn, m):
-    z = np.round(z)
-    tpr = np.sum(np.dot(xp, z) >= m) / xp.shape[0]
-    fpr = np.sum(np.dot(xn, z) >= m) / xn.shape[0]
-    print(tpr, fpr)
-    return tpr - fpr
-
-def j_exp(z, xp, xn, a=1, b=1):
-    m = z[-1]
-    z = z[:-1]
-    tpr = smash_log(np.dot(xp, z) - m).sum() / xp.shape[0]
-    fpr = smash_log(np.dot(xn, z) - m).sum() / xn.shape[0]
-    return -1 * (a*tpr - b*fpr)
-
 # Setting up the simple NLP
 m = 1
 n = 4
 N = X.shape[0]
-Ns = 16
+Ns = X.shape[1]
 bnds = ((0, 1),) * 16
 bnds += ((1, 16),)
 init = np.zeros(17)
@@ -120,23 +137,9 @@ good = opt.x.round()[:-1]
 good_cols = np.where(good == 1)[0]
 good_s = [var_list[i] for i in good_cols]
 good_s
-j(good, xp, xn, opt.x.round()[-1])
+j_lin(good, xp, xn, opt.x.round()[-1])
 
 # Now trying the compound program
-def j_exp_comp(z, xp, xn, Nc=2, a=1, b=1):
-    ns = xp.shape[1]
-    m = z[-Nc:]
-    z = z[:-Nc]
-    zmat = z.reshape((ns, Nc), order='F')
-    
-    p_hits = smash_log(smash_log(np.dot(xp, zmat) - m).sum(1) - .5).sum()
-    n_hits = smash_log(smash_log(np.dot(xn, zmat) - m).sum(1) - .5).sum()
-    
-    tpr = p_hits / xp.shape[0]
-    fpr = n_hits / xn.shape[0] 
-    
-    return -1 * (a*tpr - b*fpr)
-
 Nc = 3
 z_bnds = ((0, 1),) * Ns * Nc
 m_bnds = ((0, 16),) * Nc
@@ -148,7 +151,7 @@ m_con_mat = np.zeros((Ns, Nc))
 nmax_mat = np.concatenate([z_con_mat, m_con_mat], axis=1)
 nmax_cons = sp.optimize.LinearConstraint(nmax_mat, lb=0, ub=1)
 
-# Constraint so that m >- n for any combo
+# Constraint so that m <= n for any combo
 z_c_rows = [np.ones(Ns)] * Nc
 z_c_mat = np.zeros((Nc, Ns * Nc))
 for i, r in enumerate(z_c_rows):
