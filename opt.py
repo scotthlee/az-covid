@@ -17,6 +17,18 @@ def smash_log(x, B=10, d=0):
     return 1 / (1 + np.exp(-x * B)) - d
 
 
+def sens(z, xp=xp, B=100):
+    m = z[-1]
+    z = z[:-1]
+    return smash_log(np.dot(xp, z) - m, B=B).sum() / xp.shape[0]
+
+
+def spec(z, xn=xn, B=100):
+    m = z[-1]
+    z = z[:-1]
+    return 1 - smash_log(np.dot(xn, z) - m, B=B).sum() / xn.shape[0]
+
+
 def j_lin(z, xp, xn, m):
     z = np.round(z)
     tpr = np.sum(np.dot(xp, z) >= m) / xp.shape[0]
@@ -27,26 +39,10 @@ def j_lin(z, xp, xn, m):
 
 def j_exp(z, xp, xn, a=1, b=1):
     m = z[-1]
-    z = z[:-1]
-    tpr = smash_log(np.dot(xp, z) - m).sum() / xp.shape[0]
-    fpr = smash_log(np.dot(xn, z) - m).sum() / xn.shape[0]
+    z = smash_log(z[:-1] - .5)
+    tpr = smash_log(np.dot(xp, z) - m + .5).sum() / xp.shape[0]
+    fpr = smash_log(np.dot(xn, z) - m + .5).sum() / xn.shape[0]
     return -1 * (a*tpr - b*fpr)
-
-
-def j_exp_comp(z, xp, xn, c=2, a=1, b=1):
-    s = xp.shape[1]
-    m = z[-c:]
-    z = z[:-c]
-    zmat = z.reshape((s, c), order='F')
-    
-    p_hits = smash_log(smash_log(np.dot(xp, zmat) - m).sum(1) - .5).sum()
-    n_hits = smash_log(smash_log(np.dot(xn, zmat) - m).sum(1) - .5).sum()
-    
-    tpr = p_hits / xp.shape[0]
-    fpr = n_hits / xn.shape[0] 
-    
-    return -1 * (a*tpr - b*fpr)
-
 
 # Globals
 UNIX = True
@@ -106,13 +102,13 @@ xp = X[:len(pos), :]
 xn = X[len(pos):, :]
 
 # Setting up the simple NLP
-m = 1
-n = 4
+#m = 1
+#n = 4
 N = X.shape[0]
 Ns = X.shape[1]
-bnds = ((0, 1),) * 16
-bnds += ((1, 16),)
-init = np.zeros(17)
+bnds = ((0, 1),) * Ns
+bnds += ((1, Ns),)
+init = np.zeros(Ns + 1)
 
 # Setting up the optional constraints for m and n
 nA = np.concatenate([np.ones(Ns),
@@ -121,7 +117,15 @@ mA = np.concatenate([np.zeros(Ns),
                      np.ones(1)])
 ncon = sp.optimize.LinearConstraint(nA, lb=1, ub=n)
 mcon = sp.optimize.LinearConstraint(mA, lb=1, ub=m)
-                                    
+
+# Optional constraints for sensitivity and/or specificity
+se_con = sp.optimize.NonlinearConstraint(sens, 
+                                         lb=0.8, 
+                                         ub=1.0)
+sp_con = sp.optimize.NonlinearConstraint(spec,
+                                         lb=0.8,
+                                         ub=1.0)
+
 # Running the program
 start = time.time()
 opt = sp.optimize.minimize(
@@ -140,6 +144,29 @@ good_s
 j_lin(good, xp, xn, opt.x.round()[-1])
 
 # Now trying the compound program
+def j_exp_comp(z, xp, xn, c=2, a=1, b=1):
+    s = xp.shape[1]
+    m = z[-c:]
+    z = z[:-c]
+    zmat = z.reshape((s, c), order='F')
+    zmat = smash_log(zmat - .5)
+    
+    p_hits = smash_log(smash_log(np.dot(xp, zmat) - m + .5).sum(1) - .5).sum()
+    n_hits = smash_log(smash_log(np.dot(xn, zmat) - m + .5).sum(1) - .5).sum()
+    
+    tpr = p_hits / xp.shape[0]
+    fpr = n_hits / xn.shape[0] 
+    
+    return -1 * (a*tpr - b*fpr)
+
+def j_lin_comp(n_mat, m_vec, X, y):
+    counts = np.array([np.dot(X, v) for v in n_mat.T]).T
+    diffs = np.array([counts[:, i] - m_vec[i] >= 0 
+                      for i in range(len(m_vec))])
+    guesses = np.array(np.sum(diffs, 0) > 0, dtype=np.uint8)
+    j = tools.clf_metrics(y, guesses).j.values[0]
+    return j
+
 Nc = 3
 z_bnds = ((0, 1),) * Ns * Nc
 m_bnds = ((0, 16),) * Nc
@@ -176,7 +203,7 @@ start = time.time()
 opt = sp.optimize.minimize(
     fun=j_exp_comp,
     x0=init,
-    args=(xp, xn, Nc),
+    args=(xp, xn, Nc, 1),
     bounds=bnds,
     method='trust-constr',
     constraints=[nmax_cons, mn_cons, m_sum_cons]
