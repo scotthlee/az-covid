@@ -7,7 +7,7 @@ import os
 
 from multiprocessing import Pool
 from ortools.linear_solver import pywraplp
-from scipy.special import expit
+from scipy.special import expit, erf
 
 import tools
 import multi
@@ -144,20 +144,28 @@ good_s
 j_lin(good, xp, xn, opt.x.round()[-1])
 
 # Now trying the compound program
-def j_exp_comp(z, xp, xn, c=2, a=1, b=1):
+def j_exp_comp(z, xp, xn, c=2, a=1, b=1, th=0):
+    # Setting things up
     s = xp.shape[1]
     m = z[-c:]
     z = z[:-c]
-    zmat = z.reshape((s, c), order='F')
-    zmat = smash_log(zmat - .5)
+    z = z.reshape((s, c), order='F')
+    z = smash_log(z - .5, B=15)
     
-    p_hits = smash_log(smash_log(np.dot(xp, zmat) - m + .5).sum(1) - .5).sum()
-    n_hits = smash_log(smash_log(np.dot(xn, zmat) - m + .5).sum(1) - .5).sum()
+    # Penalizing bins where m > n
+    nvals = z.sum(0)
+    diffs = smash_log(nvals - mvals - .5)
+    mn_penalty = th * (c - diffs.sum())
+    
+    # Now calculating the hits
+    p_hits = smash_log(smash_log(np.dot(xp, z) - m + .5).sum(1) - .5).sum()
+    n_hits = smash_log(smash_log(np.dot(xn, z) - m + .5).sum(1) - .5).sum()
     
     tpr = p_hits / xp.shape[0]
     fpr = n_hits / xn.shape[0] 
+    weighted_j = a*tpr - b*fpr
     
-    return -1 * (a*tpr - b*fpr)
+    return -1 * weighted_j + mn_penalty
 
 def j_lin_comp(n_mat, m_vec, X, y):
     counts = np.array([np.dot(X, v) for v in n_mat.T]).T
@@ -166,6 +174,18 @@ def j_lin_comp(n_mat, m_vec, X, y):
     guesses = np.array(np.sum(diffs, 0) > 0, dtype=np.uint8)
     j = tools.clf_metrics(y, guesses).j.values[0]
     return j
+
+def m_morethan_n(z, c=Nc, s=Ns):
+    # Setting things up
+    s = xp.shape[1]
+    m = z[-c:]
+    z = z[:-c]
+    z = z.reshape((s, c), order='F')
+    z = smash_log(z - .5, B=15)
+    nvals = z.sum(0)
+    diffs = smash_log(nvals - mvals + .5)
+    return (c - diffs.sum())
+
 
 Nc = 3
 z_bnds = ((0, 1),) * Ns * Nc
@@ -188,7 +208,12 @@ for i, r in enumerate(z_c_rows):
 
 z_c_mat = np.concatenate([z_c_mat, np.identity(Nc) * -1],
                          axis=1)
-mn_cons = sp.optimize.LinearConstraint(z_c_mat, lb=0, ub=np.inf)
+mn_cons = sp.optimize.LinearConstraint(z_c_mat, 
+                                       lb=0, 
+                                       ub=np.inf)
+mn_cons = sp.optimize.NonlinearConstraint(m_morethan_n, 
+                                          lb=-np.inf, 
+                                          ub=0.999)
 
 # Constraint that at least one combo must have m >= 1
 m_sum = np.concatenate([np.zeros(Ns * Nc),
@@ -203,10 +228,10 @@ start = time.time()
 opt = sp.optimize.minimize(
     fun=j_exp_comp,
     x0=init,
-    args=(xp, xn, Nc, 1),
+    args=(xp, xn, Nc),
     bounds=bnds,
     method='trust-constr',
-    constraints=[nmax_cons, mn_cons, m_sum_cons]
+    constraints=[nmax_cons, m_sum_cons, mn_cons]
 )
 end = time.time()
 start - end
@@ -214,7 +239,7 @@ start - end
 solution = opt.x.round()
 mvals = solution[-Nc:]
 good = solution[:-Nc].reshape((Ns, Nc), order='F')
-j_exp_comp(opt.x.round(), xp, xn, Nc)
+j_lin_comp(good, mvals, X, y)
 
 # And now trying it as a linear program; first setting up the constraints
 H = 100
