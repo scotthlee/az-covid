@@ -10,7 +10,7 @@ import multi
 
 
 # Globals
-UNIX = False
+UNIX = True
 USE_TODAY = False
 COMBINED = True
 
