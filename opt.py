@@ -44,6 +44,51 @@ def j_exp(z, xp, xn, a=1, b=1):
     fpr = smash_log(np.dot(xn, z) - m + .5).sum() / xn.shape[0]
     return -1 * (a*tpr - b*fpr)
 
+
+def j_exp_comp(z, xp, xn, c=2, a=1, b=1, th=0):
+    # Setting things up
+    s = xp.shape[1]
+    m = z[-c:]
+    z = z[:-c]
+    z = z.reshape((s, c), order='F')
+    z = smash_log(z - .5, B=15)
+    
+    # Penalizing bins where m > n
+    nvals = z.sum(0)
+    diffs = smash_log(nvals - m - .5)
+    mn_penalty = th * (c - diffs.sum())
+    
+    # Now calculating the hits
+    p_hits = smash_log(smash_log(np.dot(xp, z) - m + .5).sum(1) - .5).sum()
+    n_hits = smash_log(smash_log(np.dot(xn, z) - m + .5).sum(1) - .5).sum()
+    
+    tpr = p_hits / xp.shape[0]
+    fpr = n_hits / xn.shape[0] 
+    weighted_j = a*tpr - b*fpr
+    
+    return -1 * weighted_j + mn_penalty
+
+
+def j_lin_comp(n_mat, m_vec, X, y):
+    counts = np.array([np.dot(X, v) for v in n_mat.T]).T
+    diffs = np.array([counts[:, i] - m_vec[i] >= 0 
+                      for i in range(len(m_vec))])
+    guesses = np.array(np.sum(diffs, 0) > 0, dtype=np.uint8)
+    j = tools.clf_metrics(y, guesses).j.values[0]
+    return j
+
+
+def m_morethan_n(z, c=Nc, s=Ns):
+    # Setting things up
+    m = z[-c:]
+    z = z[:-c]
+    z = z.reshape((s, c), order='F')
+    z = smash_log(z - .5, B=15)
+    nvals = z.sum(0)
+    diffs = smash_log(nvals - m + .5)
+    return (c - diffs.sum())
+
+
 # Globals
 UNIX = True
 USE_TODAY = False
@@ -144,49 +189,6 @@ good_s
 j_lin(good, xp, xn, opt.x.round()[-1])
 
 # Now trying the compound program
-def j_exp_comp(z, xp, xn, c=2, a=1, b=1, th=0):
-    # Setting things up
-    s = xp.shape[1]
-    m = z[-c:]
-    z = z[:-c]
-    z = z.reshape((s, c), order='F')
-    z = smash_log(z - .5, B=15)
-    
-    # Penalizing bins where m > n
-    nvals = z.sum(0)
-    diffs = smash_log(nvals - mvals - .5)
-    mn_penalty = th * (c - diffs.sum())
-    
-    # Now calculating the hits
-    p_hits = smash_log(smash_log(np.dot(xp, z) - m + .5).sum(1) - .5).sum()
-    n_hits = smash_log(smash_log(np.dot(xn, z) - m + .5).sum(1) - .5).sum()
-    
-    tpr = p_hits / xp.shape[0]
-    fpr = n_hits / xn.shape[0] 
-    weighted_j = a*tpr - b*fpr
-    
-    return -1 * weighted_j + mn_penalty
-
-def j_lin_comp(n_mat, m_vec, X, y):
-    counts = np.array([np.dot(X, v) for v in n_mat.T]).T
-    diffs = np.array([counts[:, i] - m_vec[i] >= 0 
-                      for i in range(len(m_vec))])
-    guesses = np.array(np.sum(diffs, 0) > 0, dtype=np.uint8)
-    j = tools.clf_metrics(y, guesses).j.values[0]
-    return j
-
-def m_morethan_n(z, c=Nc, s=Ns):
-    # Setting things up
-    s = xp.shape[1]
-    m = z[-c:]
-    z = z[:-c]
-    z = z.reshape((s, c), order='F')
-    z = smash_log(z - .5, B=15)
-    nvals = z.sum(0)
-    diffs = smash_log(nvals - mvals + .5)
-    return (c - diffs.sum())
-
-
 Nc = 3
 z_bnds = ((0, 1),) * Ns * Nc
 m_bnds = ((0, 16),) * Nc
