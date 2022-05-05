@@ -25,8 +25,9 @@ file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
 rf_df = pd.read_csv(file_dir + 'rf_records.csv')
 combo_df = pd.read_csv(file_dir + 'combo_stats.csv')
 
-# Converting specificity to FPR to make plotting easier
+# Converting to FPR/TPR for ROC plots
 combo_df['fpr'] = 1 - combo_df.spec
+combo_df.n += 1
 
 # Getting stats for the other combos
 pcr = rf_df.pcr
@@ -56,6 +57,7 @@ ant_rocs = [roc_curve(pcr, rf_df['ant_' + str(i) + '_prob'])
 
 # Plotting combo and RF ROCs as a function of n and m
 sns.set_style('darkgrid')
+sns.set(font_scale=2)
 cr = sns.color_palette('crest')
 cb = sns.color_palette('colorblind')
 
@@ -68,6 +70,8 @@ rp = sns.relplot(x='fpr',
                  palette='crest')
 rp.set(xlim=(0, 1), ylim=(0, 1))
 rp.fig.set_tight_layout(True)
+rp.set_xlabels('1 - Specificity')
+rp.set_ylabels('Sensitivity')
 
 for n, ax in enumerate(rp.axes[0]):
     ax.plot(symp_rocs[n][0], 
