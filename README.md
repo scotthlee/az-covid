@@ -3,6 +3,15 @@
 This repo holds the code used to generate the results in our paper "Performance of Existing and Novel Symptom- and Antigen Testing-Based COVID-19 Case Definitions in a Community Setting". For more info about the study, read the preprint on medrXiv [here](https://doi.org/10.1101/2022.05.10.22274914). For more info about the Python scripts, read on.
 
 ## Code
+Running the following scripts in order will produce all of the that appeared in our paper (though not necessarily with the same formatting, some of which was done by hand), including the case definitions, performance metrics, confidence intervals, and visualizations. 
+
+1. `preprocessing.py` creates the analytic dataset from the raw data.
+2. `combos.py' runs the combinatorial optimization and makes a new version of the analytic dataset that includes our novel case definitions.
+3. `rf.py` runs the random forest part of our analysis.
+4. `inference.py` constructs confidence intervals for our main metrics.
+5. `viz.py` makes the figures in the paper.
+
+The other two scripts, `tools.py` and `multi.py` contain the support functions needed to run the other scripts. 
 
 ## Related documents
 
