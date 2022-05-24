@@ -13,6 +13,12 @@ Running the following scripts in order will produce all of the that appeared in 
 
 The other two scripts, `tools.py` and `multi.py` contain the support functions needed to run the other scripts. 
 
+## Software
+All code was written in Python 3, and the specific dependcies are listed in the [requirements](requirements.txt.) file. The dependencies can be installed one-by-one or by running e.g. `pip install -r requirements.txt`. Where possible, we used the `multiprocessing` module to speed things up.
+
+## Hardware
+We ran all our analyses on a Dell scientific workstation with 24 logical cores and 64GB of RAM. The scripts will run fine on smaller machines, but `combos.py` and `rf.py` make take a while to run.
+
 ## Related documents
 
 * [Open Practices](doc/open_practices.md)
