@@ -194,4 +194,4 @@ cand_names = ['s95', 'sa95', 's90', 'sa90', 's80', 'sa80']
 for i, cn in enumerate(cand_names):
     records[cn] = candidates[i]
 
-records.to_csv(file_dir + 'records.csv', index=False)
+records.to_csv(file_dir + 'combo_records.csv', index=False)
