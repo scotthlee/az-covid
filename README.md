@@ -1,4 +1,9 @@
 
+# Building case definitions for COVID-19
+This repo holds the code used to generate the results in our paper "Performance of Existing and Novel Symptom- and Antigen Testing-Based COVID-19 Case Definitions in a Community Setting". For more info about the study, read the preprint on medrXiv [here](https://doi.org/10.1101/2022.05.10.22274914). For more info about the Python scripts, read on.
+
+## Code
+
 ## Related documents
 
 * [Open Practices](doc/open_practices.md)
