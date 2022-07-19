@@ -83,7 +83,7 @@ def clf_metrics(true,
                 argmax_axis=1):
     '''Runs basic diagnostic stats on binary (only) predictions'''
     # Converting pd.Series to np.array
-    stype = type(pd.Series())
+    stype = type(pd.Series([0]))
     if type(pred) == stype:
         pred = pred.values
     if type(true) == stype:

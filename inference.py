@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pickle
 import time
 import os
 
@@ -12,6 +13,7 @@ import multi
 # Globals
 UNIX = True
 USE_TODAY = False
+FIRST_ONLY = True
 COMBINED = True
 
 # Using multiprocessing on Mac/Linux
@@ -51,40 +53,25 @@ else:
     if USE_TODAY:
         var_list += today_list
 
+if FIRST_ONLY:
+    date = pd.to_datetime(records.Sample_Collection_Date)
+    records['date'] = date
+    date_grouped = records.sort_values('date').groupby('PatientID')
+    records = date_grouped.head(1)
+
 # Making them combined
 pcr = records.pcr.values
 ant = records.ant.values
 
-# Pulling out some single symptoms
-taste = records.losstastesmell_comb.values
-fever = records.fever_comb.values
-head = records.headache_comb.values
-chills = records.chills_comb.values
-ma = records.ma_comb.values
-shiver = records.shiver_comb.values
-breath = records.difficultbreath_comb.values
-cough = records.cough_comb.values
-fatigue = records.fatigue_comb.values
-
-# Reconstructing some candidate definitions
-s95 = np.array(head + fever + taste >= 2, dtype=np.uint8)
-sa95 = np.array((shiver + head + taste >= 2) | (ant == 1),
-                dtype=np.uint8)
-
-s90 = np.array(fever + chills + taste >= 1, dtype=np.uint8)
-sa90 = np.array((breath + chills + taste >=1) | (ant == 1),
-                dtype=np.uint8)
-
-s80 = np.array(fever + chills + cough + ma + taste >= 1, dtype=np.uint8)
-sa80 = np.array((fever + chills + fatigue + ma + taste >= 1) | (ant == 1),
-                dtype=np.uint8)
+# Running the symptom CIs
+var_list += ['ant']
+var_cis = [multi.boot_cis(pcr, records[s]) for s in var_list]
 
 # Running the candidate cis
-candidates = [s95, sa95, s90, sa90, s80, sa80]
 cand_names = ['s95', 'sa95', 's90', 'sa90', 's80', 'sa80']
 cand_cis = []
-for c in candidates:
-    cand_cis.append(multi.boot_cis(pcr, c))
+for c in cand_names:
+    cand_cis.append(multi.boot_cis(pcr, records[c]))
 
 # Running CIs for the existing definitions
 cc1_cis = multi.boot_cis(pcr, records.cc1)
@@ -100,8 +87,9 @@ def_names = ['cc1', 'cc1a', 'cc4', 'cc4a', 'cste', 'cstea']
 def_cis = [cc1_cis, cc1a_cis, cc4_cis, cc4a_cis, cste_cis, cstea_cis]
 
 # Bundling everything and pickling for later
-all_cis = cand_cis + def_cis
-all_names = cand_names + def_names
+var_names = [s.replace('_comb', '') for s in var_list]
+all_cis = var_cis + cand_cis + def_cis
+all_names = var_names + cand_names + def_names
 ci_dict = dict(zip(all_names, all_cis))
 
 with open(file_dir + 'pkl/cis.pkl', 'wb') as f:
@@ -110,6 +98,4 @@ with open(file_dir + 'pkl/cis.pkl', 'wb') as f:
 # Writing the CIs to a table
 ci_tab = tools.merge_ci_list(all_cis, round=2)
 ci_tab['rule'] = all_names
-ci_tab.to_csv(file_dir + 'compound_cis.csv', index=False)
-
-
+ci_tab.to_csv(file_dir + 'all_cis.csv', index=False)

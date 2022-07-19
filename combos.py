@@ -13,12 +13,12 @@ import multi
 
 
 # Globals
-UNIX = False
+UNIX = True
 DROP_DISC = False
 USE_TODAY = False
 USE_REV = False
 COMBINED = True
-FIRST_ONLY = False
+FIRST_ONLY = True
 NO_PREV = False
 USE_CONTACT = True
 
@@ -58,6 +58,12 @@ if COMBINED:
 else:
     if USE_TODAY:
         var_list += today_list    
+
+if FIRST_ONLY:
+    date = pd.to_datetime(records.Sample_Collection_Date)
+    records['date'] = date
+    date_grouped = records.sort_values('date').groupby('PatientID')
+    records = date_grouped.head(1)
 
 # Making them combined
 X = records[var_list].values
