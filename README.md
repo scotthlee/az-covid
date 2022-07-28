@@ -11,7 +11,7 @@ Running the following scripts in order will produce all of the that appeared in 
 4. `inference.py` constructs confidence intervals for our main metrics.
 5. `viz.py` makes the figures in the paper.
 
-The other two scripts, `tools.py` and `multi.py` contain the support functions needed to run the other scripts. 
+The other two scripts, `tools.py` and `multi.py` contain the support functions needed to run the other scripts. For the combinatorial optimzation, we use the `case-def-optimization` package, which we included with this repository as a submodule.
 
 ## Software
 All code was written in Python 3, and the specific dependcies are listed in the [requirements](requirements.txt.) file. The dependencies can be installed one-by-one or by running e.g. `pip install -r requirements.txt`. Where possible, we used the `multiprocessing` module to speed things up.
