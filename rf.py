@@ -20,7 +20,7 @@ UNIX = True
 DROP_DISC = False
 USE_TODAY = False
 COMBINED = True
-FIRST_ONLY = True
+FIRST_ONLY = False # Toggle for repeated obs. sensitivity analysis
 NO_PREV = False
 MAX_N = 5
 
@@ -35,7 +35,7 @@ else:
 # Importing the original data
 file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
 dir_files = os.listdir(file_dir)
-records = pd.read_csv(file_dir + 'combo_records.csv')
+records = pd.read_csv(file_dir + 'records.csv')
 
 # List of symptom names and case definitions
 symptom_list = [
@@ -77,11 +77,11 @@ fts = []
 
 # Training RFs with and without antigen as a predictor
 for m in range(1, MAX_N + 1):
-    s = 'training forests with max depth of ' + str(m)
+    s = 'training forests with ' + str(m) + ' leaf nodes'
     print(s)
-    
+    nodes = m + 1
     rf = RandomForestClassifier(n_estimators=10000,
-                                max_depth=m, 
+                                max_leaf_nodes=nodes, 
                                 n_jobs=-1, 
                                 oob_score=True)
     rf.fit(X, pcr)
@@ -89,7 +89,7 @@ for m in range(1, MAX_N + 1):
     records['symp_' + str(m) + '_prob'] = probs
     
     rf_ant = RandomForestClassifier(n_estimators=10000,
-                                    max_depth=m+1,
+                                    max_leaf_nodes=nodes+1,
                                     n_jobs=-1,
                                     oob_score=True)
     rf_ant.fit(X_ant, pcr)

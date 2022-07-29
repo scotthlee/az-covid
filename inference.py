@@ -13,7 +13,7 @@ import multi
 # Globals
 UNIX = True
 USE_TODAY = False
-FIRST_ONLY = True
+FIRST_ONLY = False
 COMBINED = True
 
 # Using multiprocessing on Mac/Linux
