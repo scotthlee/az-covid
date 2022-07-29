@@ -18,7 +18,7 @@ DROP_DISC = False
 USE_TODAY = False
 USE_REV = False
 COMBINED = True
-FIRST_ONLY = True
+FIRST_ONLY = False
 NO_PREV = False
 USE_CONTACT = True
 

@@ -1,0 +1,3 @@
+[submodule "case_def_optimization"]
+	path = case_def_optimization
+	url = https://github.com/scotthlee/case_def_optimization
