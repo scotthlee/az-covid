@@ -1,21 +1,9 @@
 import numpy as np
 import pandas as pd
-
-import tools
-
-import numpy as np
-import pandas as pd
 import itertools
 import pickle
 import time
 import os
-
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.multioutput import MultiOutputClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_curve, precision_recall_curve
-from sklearn.metrics import roc_auc_score
 
 import tools
 

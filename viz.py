@@ -58,6 +58,7 @@ ant_rocs = [roc_curve(pcr, rf_df['ant_' + str(i) + '_prob'])
 # Plotting combo and RF ROCs as a function of n and m
 sns.set_style('darkgrid')
 sns.set(font_scale=2)
+gr = sns.color_palette('gray_r')
 cr = sns.color_palette('crest')
 cb = sns.color_palette('colorblind')
 
@@ -67,7 +68,7 @@ rp = sns.relplot(x='fpr',
                  col='n', 
                  data=combo_df,
                  kind='scatter',
-                 palette='crest')
+                 palette='inverse')
 rp.set(xlim=(0, 1), ylim=(0, 1))
 rp.fig.set_tight_layout(True)
 rp.set_xlabels('1 - Specificity')
@@ -92,18 +93,18 @@ sns.scatterplot(x='fpr',
                 data=combo_df, 
                 hue='type',
                 alpha=0.4,
-                palette='colorblind')
+                palette='gray_r')
 
 for i, df in enumerate(def_stats):
     if 'ant' in def_names[i]:
-        col = cb[3]
+        col = gr[4]
     else:
-        col = cb[3]
+        col = gr[3]
     
     fpr = 1 - df.spec
     tpr = df.sens
     plt.scatter(x=fpr, y=tpr, color=col)
-    plt.text(x=fpr, y=tpr, s=def_names[i])
+    #plt.text(x=fpr, y=tpr, s=def_names[i])
 
 plt.xlabel('1 - Specificity')
 plt.ylabel('Sensitivity')

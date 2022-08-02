@@ -12,28 +12,6 @@ from multiprocessing import Pool
 from copy import deepcopy
 
 
-def vif(df, return_df=True):
-    '''Calculates variance inflation factors (VIFs) a design matrix.
-    
-    Parameters
-      df: the design matrix as a pd.DataFrame with variable/level names as cols
-      return_df: whether to return a pd.DataFrame or just the VIFs
-    
-    Returns
-      the VIFs 
-    '''
-    # Calculating the VIFs
-    R = np.corrcoef(df, rowvar=False)
-    R_inv = np.linalg.inv(R)
-    vif = R_inv.diagonal()
-    
-    if return_df:
-        vif = pd.DataFrame([df.columns.values, vif]).transpose()
-        vif.columns = ['var', 'vif']
-    
-    return vif
-
-
 # Quick function for thresholding probabilities
 def threshold(probs, cutoff=.5):
     return np.array(probs >= cutoff).astype(np.uint8)
@@ -136,8 +114,8 @@ def clf_metrics(true,
         # Rounding things off
         out = out.round(round)
         count_cols = [
-                      'tp', 'fp', 'tn', 'fn', 'true_prev',
-                      'pred_prev', 'prev_diff'
+            'tp', 'fp', 'tn', 'fn', 'true_prev',
+            'pred_prev', 'prev_diff'
         ]
         out[count_cols] = out[count_cols].round()
         
@@ -236,51 +214,6 @@ def jackknife_metrics(targets,
     means = scores.mean()
     
     return scores, means
-
-
-def invert_BCA(q, b, acc, lower=True):
-    if np.isnan(q):
-        return q
-    if np.any(q >= 1):
-        q /= 100
-    z = norm.ppf(q)
-    numer = z - 2*b - z*b*acc - b**2*acc
-    denom = 1 + b*acc + z*acc
-    if lower:
-        return 2 * norm.cdf(numer / denom)
-    else:
-        return 2 * (1 - norm.cdf(numer / denom))
-
-
-def BCA_pval(bca, null=0.0):
-    scores = bca.scores
-    n_cols = bca.scores.shape[1]
-    
-    # Making the vector of null values
-    if type(null) == type(0.0):
-        null = np.array([null] * n_cols)
-    
-    # Figuring out which nulls exist in the bootstrap data
-    good_nulls = []
-    for i in range(n_cols):
-        col = scores.iloc[:, i]
-        good_nulls.append(col.min() <= null[i] <= col.max())
-    
-    # Getting the percentile for each null
-    null_qs = np.array([percentileofscore(bca.scores.iloc[:, i], null[i]) 
-               if good_nulls[i] else np.nan for i in range(n_cols)]) / 100
-    
-    # Figuring out whether to look at the lower or upper quantile
-    lower = [q <= .5 if not np.isnan(q) else q for q in null_qs]
-    
-    # Getting the p-value associated with each null percentile
-    pvals = np.array([invert_BCA(null_qs[i],
-                                 bca.b[i],
-                                 bca.acc[i],
-                                 lower=lower[i])
-                      for i in range(n_cols)])
-    
-    return pvals, good_nulls, null_qs, lower
 
 
 def boot_stat_cis(stat,
@@ -401,7 +334,7 @@ class boot_cis:
         guesses,
         n=100,
         a=0.05,
-        group=None,
+        sample_by=None,
         method="bca",
         interpolation="nearest",
         average='weighted',
@@ -564,14 +497,13 @@ def jackknife_sample(X):
     return j_rows
 
 
-# Generates bootstrap indices of a dataset with the option
-# to stratify by one of the (binary-valued) variables
 def boot_sample(df,
                 by=None,
                 size=None,
                 seed=None,
                 return_df=False):
-    
+    """Samples row indices with replacement, with the option to sample 
+    by a separate variable."""
     # Setting the random states for the samples
     if seed is None:
         seed = np.random.randint(1, 1e6, 1)[0]
@@ -593,11 +525,14 @@ def boot_sample(df,
     else:
         levels = np.unique(by)
         n_levels = len(levels)
-        level_ids = [np.where(by == level)[0]
+        level_rows = [np.where(by == level)[0]
                      for level in levels]
-        boot = [np.random.choice(ids, size=len(ids), replace=True)
-                for ids in level_ids]
-        boot = np.concatenate(boot).ravel()
+        row_dict = dict(zip(levels, level_rows))
+        boot = np.random.choice(levels,
+                                size=n_levels, 
+                                replace=True)
+        obs = flatten([row_dict[b] for b in boot])
+        boot = np.array(obs)
     
     if not return_df:
         return boot

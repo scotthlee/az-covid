@@ -27,7 +27,7 @@ else:
 # Importing the original data
 file_dir = base_dir + 'OneDrive - CDC/Documents/projects/az covid/'
 dir_files = os.listdir(file_dir)
-records = pd.read_csv(file_dir + 'combo_records.csv')
+records = pd.read_csv(file_dir + 'rf_records.csv')
 
 # List of symptom names and case definitions
 symptom_list = [
@@ -62,29 +62,40 @@ if FIRST_ONLY:
 # Making them combined
 pcr = records.pcr.values
 ant = records.ant.values
+ids = records.PatientID.values
 
 # Running the symptom CIs
 var_list += ['ant']
-var_cis = [multi.boot_cis(pcr, records[s]) for s in var_list]
+var_cis = [multi.boot_cis(targets=pcr, 
+                          guesses=records[s], 
+                          sample_by=ids) for s in var_list]
 
 # Running the candidate cis
 cand_names = ['s95', 'sa95', 's90', 'sa90', 's80', 'sa80']
 cand_cis = []
 for c in cand_names:
-    cand_cis.append(multi.boot_cis(pcr, records[c]))
+    cand_cis.append(multi.boot_cis(targets=pcr, 
+                                   guesses=records[c],
+                                   sample_by=ids))
 
 # Running CIs for the existing definitions
-cc1_cis = multi.boot_cis(pcr, records.cc1)
-cc1a_cis = multi.boot_cis(pcr, (records.cc1) | (ant == 1))
+cc1_cis = multi.boot_cis(pcr, records.cc1, 
+                         sample_by=ids)
+cc1a_cis = multi.boot_cis(pcr, (records.cc1) | (ant == 1),
+                          sample_by=ids)
 
-cc4_cis = multi.boot_cis(pcr, records.cc4)
-cc4a_cis = multi.boot_cis(pcr, (records.cc4) | (ant == 1))
+cc4_cis = multi.boot_cis(pcr, records.cc4,
+                          sample_by=ids)
+cc4a_cis = multi.boot_cis(pcr, (records.cc4) | (ant == 1),
+                          sample_by=ids)
 
-cste_cis = multi.boot_cis(pcr, records.cste_new)
-cstea_cis = multi.boot_cis(pcr, (records.cste_new) | (ant == 1))
+cste_cis = multi.boot_cis(pcr, records.cste_clin_exp,
+                          sample_by=ids)
+cstea_cis = multi.boot_cis(pcr, (records.cste_new) | (ant == 1),
+                          sample_by=ids)
 
-def_names = ['cc1', 'cc1a', 'cc4', 'cc4a', 'cste', 'cstea']
-def_cis = [cc1_cis, cc1a_cis, cc4_cis, cc4a_cis, cste_cis, cstea_cis]
+def_names = ['cc1', 'cc4', 'cste', 'cc1a', 'cc4a', 'cstea']
+def_cis = [cc1_cis, cc4_cis, cste_cis, cc1a_cis, cc4a_cis, cstea_cis]
 
 # Bundling everything and pickling for later
 var_names = [s.replace('_comb', '') for s in var_list]

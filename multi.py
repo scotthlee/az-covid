@@ -12,14 +12,21 @@ from multiprocessing import Pool
 from copy import deepcopy
 
 from tools import (mcnemar_test, brier_score, threshold, 
-                   clf_metrics, boot_sample)
+                   clf_metrics, boot_sample, flatten)
 
 
 def jackknife_metrics(targets, 
-                      guesses, 
+                      guesses,
+                      sample_by=None, 
                       average='weighted'):
     # Replicates of the dataset with one row missing from each
-    rows = np.array(list(range(targets.shape[0])))
+    if sample_by:
+        groups = np.unique(sample_by)
+        rows = np.where([sample_by == g for g in groups])[0]
+        rows = np.array(flatten(rows))
+    else:
+        rows = np.array(list(range(targets.shape[0])))
+    
     j_rows = [np.delete(rows, row) for row in rows]
 
     # using a pool to get the metrics across each
@@ -40,7 +47,7 @@ class boot_cis:
         guesses,
         n=100,
         a=0.05,
-        group=None,
+        sample_by=None,
         method="bca",
         interpolation="nearest",
         average='weighted',
@@ -65,7 +72,7 @@ class boot_cis:
         # Making an empty holder for the output
         scores = pd.DataFrame(np.zeros(shape=(n, stat.shape[0])),
                               columns=colnames)
-
+        
         # Setting the seed
         if seed is None:
             seed = np.random.randint(0, 1e6, 1)
@@ -73,7 +80,9 @@ class boot_cis:
         seeds = np.random.randint(0, 1e6, n)
 
         # Generating the bootstrap samples and metrics
-        boots = [boot_sample(targets, seed=seed) for seed in seeds]
+        boots = [boot_sample(targets, 
+                             by=sample_by,
+                             seed=seed) for seed in seeds]
         score_input = [(targets[b], guesses[b]) for b in boots]
         with Pool() as p:
             scores = p.starmap(clf_metrics, score_input)
