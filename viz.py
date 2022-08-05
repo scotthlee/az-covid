@@ -29,9 +29,17 @@ combo_df = pd.read_csv(file_dir + 'combo_stats.csv')
 combo_df['fpr'] = 1 - combo_df.spec
 combo_df.n += 1
 
-# Getting stats for the other combos
+# Adding the special columns if they're not there
 pcr = rf_df.pcr
 ant = rf_df.ant
+taste = rf_df.losstastesmell_comb.values
+cc1 = rf_df.cc1_comb
+cc4 = rf_df.cc4_comb
+rf_df['taste_ant'] = np.array(ant + taste > 0, dtype=np.uint8)
+rf_df['cc1_ant'] = np.array(ant + cc1 > 0, dtype=np.uint8)
+rf_df['cc4_ant'] = np.array(ant + cc4 > 0, dtype=np.uint8)
+
+# Getting stats for the other combos
 def_cols = [
     rf_df.losstastesmell_comb, rf_df.cc1_comb, rf_df.cc4_comb, 
     rf_df.cste_new, rf_df.taste_ant, rf_df.cc1_ant, 
@@ -68,7 +76,7 @@ rp = sns.relplot(x='fpr',
                  col='n', 
                  data=combo_df,
                  kind='scatter',
-                 palette='inverse')
+                 palette='gray_r')
 rp.set(xlim=(0, 1), ylim=(0, 1))
 rp.fig.set_tight_layout(True)
 rp.set_xlabels('1 - Specificity')
