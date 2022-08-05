@@ -32,6 +32,13 @@ combo_df.n += 1
 # Getting stats for the other combos
 pcr = rf_df.pcr
 ant = rf_df.ant
+taste = rf_df.losstastesmell_comb.values
+cc1 = rf_df.cc1_comb.values
+cc4 = rf_df.cc4_comb.values
+rf_df['taste_ant'] = np.array(ant + taste > 0, dtype=np.uint8)
+rf_df['cc1_ant'] = np.array(ant + cc1 > 0, dtype=np.uint8)
+rf_df['cc4_ant'] = np.array(ant + cc4 > 0, dtype=np.uint8)
+
 def_cols = [
     rf_df.losstastesmell_comb, rf_df.cc1_comb, rf_df.cc4_comb, 
     rf_df.cste_new, rf_df.taste_ant, rf_df.cc1_ant, 
@@ -57,7 +64,7 @@ ant_rocs = [roc_curve(pcr, rf_df['ant_' + str(i) + '_prob'])
 
 # Plotting combo and RF ROCs as a function of n and m
 sns.set_style('darkgrid')
-sns.set(font_scale=2)
+sns.set(font_scale=1)
 gr = sns.color_palette('gray_r')
 cr = sns.color_palette('crest')
 cb = sns.color_palette('colorblind')
@@ -68,7 +75,7 @@ rp = sns.relplot(x='fpr',
                  col='n', 
                  data=combo_df,
                  kind='scatter',
-                 palette='inverse')
+                 palette='crest')
 rp.set(xlim=(0, 1), ylim=(0, 1))
 rp.fig.set_tight_layout(True)
 rp.set_xlabels('1 - Specificity')
@@ -88,27 +95,52 @@ for n, ax in enumerate(rp.axes[0]):
 plt.show()
 
 # Plotting case definitions against combos
+sns.set(font_scale=.8)
 sns.scatterplot(x='fpr', 
                 y='sens', 
                 data=combo_df, 
                 hue='type',
                 alpha=0.4,
-                palette='gray_r')
+                palette='gray',
+                linewidth=0)
 
+sns.set(font_scale=.7)
 for i, df in enumerate(def_stats):
-    if 'ant' in def_names[i]:
-        col = gr[4]
+    label = def_names[i]
+    if ('ant' in label) or (label == 'CSTE'):
+        col = gr[5]
     else:
-        col = gr[3]
+        col = gr[1]
     
+    x_off = .004
+    y_off = -.008
+    
+    if label in ['Reses4+ant', 's95']:
+        y_off = .005
+        
     fpr = 1 - df.spec
     tpr = df.sens
-    plt.scatter(x=fpr, y=tpr, color=col)
-    #plt.text(x=fpr, y=tpr, s=def_names[i])
+    plt.scatter(x=fpr, y=tpr,
+                s=20, 
+                color=gr[5],
+                edgecolors='white',
+                linewidth=0.9)
+    plt.text(x=fpr + x_off, 
+             y=tpr + y_off,
+             color=gr[5], 
+             s=label,
+             bbox=dict(boxstyle='square,pad=0.05',
+                       fc='lightgray',
+                       ec='white'),
+             fontweight='semibold')
 
 plt.xlabel('1 - Specificity')
 plt.ylabel('Sensitivity')
 plt.tight_layout()
+plt.savefig(file_dir + 'figures/figure_1.pdf', 
+            dpi=1000,
+            format='pdf',
+            bbox_inches='tight')
 plt.show()
 
 '''
