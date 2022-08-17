@@ -1,10 +1,7 @@
 import numpy as np
 import pandas as pd
 import pickle
-import time
 import os
-
-from multiprocessing import Pool
 
 import tools
 import multi
@@ -53,16 +50,43 @@ else:
     if USE_TODAY:
         var_list += today_list
 
-if FIRST_ONLY:
-    date = pd.to_datetime(records.Sample_Collection_Date)
-    records['date'] = date
-    date_grouped = records.sort_values('date').groupby('PatientID')
-    records = date_grouped.head(1)
-
 # Making them combined
 pcr = records.pcr.values
 ant = records.ant.values
 ids = records.PatientID.values
+
+# Making a few constructed variables
+N = records.shape[0]
+records['any_ever'] = pd.Series(records[var_list].sum(1) > 0).astype(np.uint8)
+records['any_now'] = pd.Series(records[today_list].sum(1) > 0).astype(np.uint8)
+records['tp'] = pd.Series(pcr + ant == 2).astype(np.uint8)
+records['tn'] = pd.Series(pcr + ant == 0).astype(np.uint8)
+records['fp'] = pd.Series((ant == 1) & (pcr == 0)).astype(np.uint8)
+records['fn'] = pd.Series((ant == 0) & (pcr == 1)).astype(np.uint8)
+
+# Making a version with only the first visits for doing the demog tables
+date = pd.to_datetime(records.Sample_Collection_Date)
+records['date'] = date
+date_grouped = records.sort_values('date').groupby('PatientID')
+first_records = date_grouped.head(1)
+if FIRST_ONLY:
+    records = first_records
+
+# Making a supplemental table 1
+dem_cols = ['Patient_Sex','AGEGRP', 'Patient_Race',
+              'Patient_Ethnicity']
+dem_tabs = [pd.crosstab(first_records[c], 'n') for c in dem_cols]
+dem_tabs = pd.concat(dem_tabs, axis=0)
+dem_tabs['%'] = dem_tabs.n / first_records.shape[0]
+dem_tabs.to_csv(file_dir + 'dem_tabs.csv')
+
+test_cols = ['any_now', 'any_ever', 'poscovid', 
+             'closecontact', 'ant', 'pcr', 
+             'tp', 'tn', 'fp', 'fn']
+test_tabs = [pd.crosstab(records[c], 'n') for c in test_cols]
+test_tabs = pd.concat(test_tabs, axis=0)
+test_tabs['%'] = test_tabs.n / N
+test_tabs.to_csv(file_dir + 'test_tabs.csv')
 
 # Running the symptom CIs
 var_list += ['ant']
