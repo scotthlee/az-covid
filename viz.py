@@ -5,6 +5,7 @@ import os
 
 from matplotlib import pyplot as plt
 from sklearn.metrics import roc_curve
+from skimage.color import rgb2gray
 
 import tools
 
@@ -33,21 +34,15 @@ combo_df.n += 1
 pcr = rf_df.pcr
 ant = rf_df.ant
 taste = rf_df.losstastesmell_comb.values
-<<<<<<< HEAD
+
 cc1 = rf_df.cc1_comb.values
 cc4 = rf_df.cc4_comb.values
-=======
-cc1 = rf_df.cc1_comb
-cc4 = rf_df.cc4_comb
->>>>>>> 185301f300774b5092c2aeb2fc2de5391bca8194
+
 rf_df['taste_ant'] = np.array(ant + taste > 0, dtype=np.uint8)
 rf_df['cc1_ant'] = np.array(ant + cc1 > 0, dtype=np.uint8)
 rf_df['cc4_ant'] = np.array(ant + cc4 > 0, dtype=np.uint8)
 
-<<<<<<< HEAD
-=======
 # Getting stats for the other combos
->>>>>>> 185301f300774b5092c2aeb2fc2de5391bca8194
 def_cols = [
     rf_df.losstastesmell_comb, rf_df.cc1_comb, rf_df.cc4_comb, 
     rf_df.cste_new, rf_df.taste_ant, rf_df.cc1_ant, 
@@ -72,29 +67,31 @@ ant_rocs = [roc_curve(pcr, rf_df['ant_' + str(i) + '_prob'])
              for i in range(1, 6)]
 
 # Plotting combo and RF ROCs as a function of n and m
-sns.set_style('darkgrid')
-sns.set(font_scale=1)
 gr = sns.color_palette('gray_r')
 cr = sns.color_palette('crest')
 cb = sns.color_palette('colorblind')
+sns.set_style('ticks', rc={'fontname': 'arial', 'fontsize': 8})
 
+facet_kws = {'sharex': False, 'sharey': False}
 rp = sns.relplot(x='fpr', 
                  y='sens', 
                  hue='m', 
                  col='n', 
                  data=combo_df,
+                 col_wrap=3,
+                 height=3.1,
+                 aspect=.74,
                  kind='scatter',
-<<<<<<< HEAD
-                 palette='crest')
-=======
-                 palette='gray_r')
->>>>>>> 185301f300774b5092c2aeb2fc2de5391bca8194
-rp.set(xlim=(0, 1), ylim=(0, 1))
-rp.fig.set_tight_layout(True)
-rp.set_xlabels('1 - Specificity')
-rp.set_ylabels('Sensitivity')
+                 palette='crest',
+                 legend=False,
+                 facet_kws=facet_kws)
 
-for n, ax in enumerate(rp.axes[0]):
+titles = ['A)', 'B)', 'C)', 'D)', 'E)']
+for n, ax in enumerate(rp.axes):
+    ax.set(ylabel='Sensitivity', 
+           xlabel='1 - Specificity',
+           xlim=(0, 0.4),
+           ylim=(0, 1))
     ax.plot(symp_rocs[n][0], 
             symp_rocs[n][1],
             alpha=0.5,
@@ -103,23 +100,47 @@ for n, ax in enumerate(rp.axes[0]):
             ant_rocs[n][1],
             alpha=0.5,
             color=cr[4])
-    ax.set_xlim((0, 0.4))
+    ax.set_title('')
+    ax.set_title(titles[n], position=(-.2, 1.5))
 
-plt.show()
+dpi = 1000
+rp.fig.set_dpi(dpi)
+rp.fig.canvas.draw()
+img = np.frombuffer(rp.fig.canvas.tostring_rgb(),
+                    dtype=np.uint8)
+width, height = rp.fig.get_size_inches() * rp.fig.get_dpi()
+img = img.reshape(int(height), int(width), 3)
+
+plt.imsave(file_dir + '/final/figure_1.pdf',
+           dpi=dpi,
+           arr=rgb2gray(img),
+           cmap=plt.cm.gray)
+plt.imsave(file_dir + '/final/figure_1.svg',
+           dpi=dpi,
+           arr=rgb2gray(img),
+           cmap=plt.cm.gray)
 
 # Plotting case definitions against combos
-sns.set(font_scale=.8)
-sns.scatterplot(x='fpr', 
-                y='sens', 
-                data=combo_df, 
-                hue='type',
-                alpha=0.4,
-                palette='gray',
-                linewidth=0)
+sns.set_style('ticks', rc={'fontname': 'arial', 'fontsize': 8})
+rcParams['figure.figsize'] = (7, 6)
+plt.figure(dpi=1000, figsize=(7, 6))
+sp = sns.scatterplot(x='fpr', 
+                     y='sens', 
+                     data=combo_df,
+                     hue='type',
+                     alpha=0.4,
+                     palette='gray',
+                     legend=False,
+                     linewidth=0)
+sp.set(xlim=(0, 0.4), ylim=(0,1))
 
-sns.set(font_scale=.7)
+def_abbrs = ['A', 'B', 'C', 'D', 'E',
+             'F', 'G', 'H', 'I', 'J',
+             'K', 'L', 'M', 'N']
+
 for i, df in enumerate(def_stats):
     label = def_names[i]
+    abbr = def_abbrs[i]
     if ('ant' in label) or (label == 'CSTE'):
         col = gr[5]
     else:
@@ -130,6 +151,9 @@ for i, df in enumerate(def_stats):
     
     if label in ['Reses4+ant', 's95']:
         y_off = .005
+    
+    if label in ['Reses4', 's95+ant']:
+        y_off -= .010
         
     fpr = 1 - df.spec
     tpr = df.sens
@@ -141,7 +165,7 @@ for i, df in enumerate(def_stats):
     plt.text(x=fpr + x_off, 
              y=tpr + y_off,
              color=gr[5], 
-             s=label,
+             s=abbr,
              bbox=dict(boxstyle='square,pad=0.05',
                        fc='lightgray',
                        ec='white'),
@@ -150,17 +174,12 @@ for i, df in enumerate(def_stats):
 plt.xlabel('1 - Specificity')
 plt.ylabel('Sensitivity')
 plt.tight_layout()
-plt.savefig(file_dir + 'figures/figure_1.pdf', 
-            dpi=1000,
+plt.savefig(file_dir + '/final/figure_2.pdf',
+            dpi=dpi,
             format='pdf',
             bbox_inches='tight')
+plt.savefig(file_dir + '/final/figure_2.svg',
+            dpi=dpi,
+            format='svg',
+            bbox_inches='tight')
 plt.show()
-
-'''
-prev = np.array(combo_df.rel_prev_diff.values - taste.rel_prev_diff.abs().values)
-prev = np.array(prev < 0)
-j = np.array((taste.j.values - combo_df.j.values) < 0)
-combo_df['better on prev'] = prev
-combo_df['better on j'] = j
-'''
-

@@ -81,8 +81,7 @@ dem_tabs['%'] = dem_tabs.n / first_records.shape[0]
 dem_tabs.to_csv(file_dir + 'dem_tabs.csv')
 
 test_cols = ['any_now', 'any_ever', 'poscovid', 
-             'closecontact', 'ant', 'pcr', 
-             'tp', 'tn', 'fp', 'fn']
+             'closecontact', 'ant', 'pcr']
 test_tabs = [pd.crosstab(records[c], 'n') for c in test_cols]
 test_tabs = pd.concat(test_tabs, axis=0)
 test_tabs['%'] = test_tabs.n / N
