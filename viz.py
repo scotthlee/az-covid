@@ -3,12 +3,31 @@ import pandas as pd
 import seaborn as sns
 import os
 
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, rcParams
 from sklearn.metrics import roc_curve
 from skimage.color import rgb2gray
 
 import tools
 
+
+def savefig(fg, fpath='', gray=True, dpi=1000):
+    fg.set_dpi(dpi)
+    fg.canvas.draw()
+    img = np.frombuffer(fg.canvas.tostring_rgb(),
+                        dtype=np.uint8)
+    width, height = fg.get_size_inches() * fg.get_dpi()
+    img = img.reshape(int(height), int(width), 3)
+    if gray:
+        img = rgb2gray(img)
+    plt.imsave(fpath,
+               dpi=dpi,
+               arr=img,
+               cmap=plt.cm.gray)
+    plt.imsave(fpath,
+               dpi=dpi,
+               arr=img,
+               cmap=plt.cm.gray)
+    return
 
 # Globals
 UNIX = False
@@ -72,58 +91,75 @@ cr = sns.color_palette('crest')
 cb = sns.color_palette('colorblind')
 sns.set_style('ticks', rc={'fontname': 'arial', 'fontsize': 8})
 
-facet_kws = {'sharex': False, 'sharey': False}
-rp = sns.relplot(x='fpr', 
-                 y='sens', 
-                 hue='m', 
-                 col='n', 
-                 data=combo_df,
-                 col_wrap=3,
-                 height=3.1,
-                 aspect=.74,
-                 kind='scatter',
-                 palette='crest',
-                 legend=False,
-                 facet_kws=facet_kws)
+# Making the panel plot
+subs = False
+if subs:
+    fig, axes = plt.subplots(2, 3)
+    fig.set_size_inches(7, 3.2 * 2)
+else:
+    fig, ax = plt.subplots(1, 1)
+    fig.set_size_inches(3.2 * .7, 3.2)
 
-titles = ['A)', 'B)', 'C)', 'D)', 'E)']
-for n, ax in enumerate(rp.axes):
+for i, n in enumerate(combo_df.n.unique()):
+    samp = combo_df[combo_df.n == n]
+    i_ = i
+    if subs:
+        j = 0
+        if i >= 3:
+            j = 1
+            i_ = i - 3
+        ax = axes[j][i_]
+        sp = sns.scatterplot(x='fpr', 
+                             y='sens',
+                             hue='m',
+                             hue_norm=(0, 4),
+                             data=samp,
+                             palette='crest',
+                             legend=False,
+                             ax=ax)
+    else:
+        fig, ax = plt.subplots(1, 1)
+        fig.set_size_inches(3.2 * .7, 3.2)
+        sns.scatterplot(x='fpr',
+                        y='sens',
+                        hue='m',
+                        hue_norm=(0, 4),
+                        data=samp,
+                        palette='crest',
+                        legend=False,
+                        ax=ax)
     ax.set(ylabel='Sensitivity', 
            xlabel='1 - Specificity',
            xlim=(0, 0.4),
            ylim=(0, 1))
-    ax.plot(symp_rocs[n][0], 
-            symp_rocs[n][1],
+    ax.plot(symp_rocs[i][0], 
+            symp_rocs[i][1],
             alpha=0.5,
             color=cr[4])
-    ax.plot(ant_rocs[n][0], 
-            ant_rocs[n][1],
+    ax.plot(ant_rocs[i][0], 
+            ant_rocs[i][1],
             alpha=0.5,
             color=cr[4])
     ax.set_title('')
-    ax.set_title(titles[n], position=(-.2, 1.5))
+    ax.text(-.14, 1.1, titles[i])
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    if not subs:
+        plt.tight_layout()
+        fn = 'Figure 1' + titles[i][0]
+        savefig(fig, file_dir + fn + '.svg')
+        savefig(fig, file_dir + fn + '.pdf')
 
-dpi = 1000
-rp.fig.set_dpi(dpi)
-rp.fig.canvas.draw()
-img = np.frombuffer(rp.fig.canvas.tostring_rgb(),
-                    dtype=np.uint8)
-width, height = rp.fig.get_size_inches() * rp.fig.get_dpi()
-img = img.reshape(int(height), int(width), 3)
+axes[1][2].axis('off')
+plt.tight_layout()
 
-plt.imsave(file_dir + '/final/figure_1.pdf',
-           dpi=dpi,
-           arr=rgb2gray(img),
-           cmap=plt.cm.gray)
-plt.imsave(file_dir + '/final/figure_1.svg',
-           dpi=dpi,
-           arr=rgb2gray(img),
-           cmap=plt.cm.gray)
+# Saving the main plot
+savefig(fig, file_dir + 'Figure 1x.pdf')
+savefig(fig, file_dir + 'Figure 1.svg')
 
 # Plotting case definitions against combos
 sns.set_style('ticks', rc={'fontname': 'arial', 'fontsize': 8})
-rcParams['figure.figsize'] = (7, 6)
-plt.figure(dpi=1000, figsize=(7, 6))
+plt.figure(figsize=(7, 6))
 sp = sns.scatterplot(x='fpr', 
                      y='sens', 
                      data=combo_df,
@@ -134,9 +170,12 @@ sp = sns.scatterplot(x='fpr',
                      linewidth=0)
 sp.set(xlim=(0, 0.4), ylim=(0,1))
 
-def_abbrs = ['A', 'B', 'C', 'D', 'E',
-             'F', 'G', 'H', 'I', 'J',
-             'K', 'L', 'M', 'N']
+#def_abbrs = ['A', 'B', 'C', 'D', 'E',
+#             'F', 'G', 'H', 'I', 'J',
+#             'K', 'L', 'M', 'N']
+def_abbrs = ['T', 'R1', 'R4', 'C', 'Ta',
+             'R1a', 'R4A', 's95', 's95a', 's90',
+             's90a', 's80', 's80a', 'a']
 
 for i, df in enumerate(def_stats):
     label = def_names[i]
